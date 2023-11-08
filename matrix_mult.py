@@ -1,15 +1,15 @@
 import numpy as np
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from timeit import timeit
+from multiprocessing.pool import Pool
 
-LENGTH = 8
-HORIZONTAL_PARTITIONS = 4
-VERTICAL_PARTITIONS = 2
+LENGTH = 9
+HORIZONTAL_PARTITIONS = 3
+VERTICAL_PARTITIONS = 3
 MIN = 0
 MAX = 5
 SHOTS = 1
 SIG_FIGS = 5
-N_POOLS = 3
+N_POOLS = 4
 
 # TODO Add input validation
 # TODO try-except statements
@@ -33,7 +33,7 @@ def partition(matrix: np.ndarray) -> list:
     # Split submatrices vertically then return
     return [m for sub_matrix in sub_matrices for m in  np.array_split(sub_matrix, VERTICAL_PARTITIONS, axis = 1)]
 
-def matrix_vector_mult(matrix_1: np.ndarray, matrix_2: np.ndarray, num: int) -> tuple:
+def matrix_vector_mult(matrix_1: np.ndarray, matrix_2: np.ndarray) -> np.ndarray:
     """
     Multiply 2 matrices
 
@@ -42,16 +42,16 @@ def matrix_vector_mult(matrix_1: np.ndarray, matrix_2: np.ndarray, num: int) -> 
         matrix_2 (np.ndarray): Matrix #2
 
     Returns:
-        tuple: Result of multiplying Matrix #1 and Matrix #2, and result's position
+        np.ndarray: Result of multiplying Matrix #1 and Matrix #2
     """
-    return matrix_1 @ matrix_2, num
+    return matrix_1 @ matrix_2
 
-def combine_results(results: np.ndarray) -> np.ndarray:
+def combine_results(results: list) -> np.ndarray:
     """
     Combines all separate submatrices into a single matrix
 
     Args:
-        results (np.ndarray): Array of matrices to combine from ProcessPoolExecutor
+        results (list): List of matrices to combine from Pool
 
     Returns:
         np.ndarray: Combined result of given matrices
@@ -61,12 +61,12 @@ def combine_results(results: np.ndarray) -> np.ndarray:
     # Sum all values in the same row, then add to combined_results
     for i in range(0, len(results), VERTICAL_PARTITIONS):
         end += VERTICAL_PARTITIONS
-        combined_results.append(np.sum(results[i:end]))
+        combined_results.append(sum(results[i:end]))
 
     # Combine all results into a single matrix
     return np.concatenate(combined_results)
 
-def processing(m1_results: list, m2_results: list) -> np.ndarray:
+def processing(m1_results: list, m2_results: list) -> list:
     """
     Uses multiprocessing to multiply partitioned matrices
 
@@ -75,34 +75,26 @@ def processing(m1_results: list, m2_results: list) -> np.ndarray:
         m2_results (list): Matrix #2 partitioned into submatrices
 
     Returns:
-        np.ndarray: Array of results from each process
+        list: List of results from each process
     """
-    processes, results, num = [ ], np.empty(len(m1_results), dtype = np.ndarray), 0
+    # Create Pool of N_POOLS processes
+    pool = Pool(processes = N_POOLS)
 
-    # Use up to N_POOLS processes to multiply partitioned matrices
-    # It's possible that less than N_POOLS processes are created and used
-    with ProcessPoolExecutor(N_POOLS) as executor:
-        # For each pair of submatrices
-        for i in range(len(m1_results)):
-            # executor schedules each calculation (i.e. multiplying 2 submatrices) that must be computed by some process
-            # Add each scheduled calculation to processes array
-            processes.append(executor.submit(matrix_vector_mult, m1_results[i], m2_results[i % VERTICAL_PARTITIONS], num))
+    # Multiply each submatrix async and in parallel, get the results, then return
+    return [pool.apply_async(matrix_vector_mult, args = (m1_results[i], m2_results[i % VERTICAL_PARTITIONS])).get() for i in range(len(m1_results))]
 
-            # Increment to keep track of result's position
-            num += 1
+def print_matrix(matrix: list) -> None:
+    """
+    Prints given matrix
 
-        # For finished processes...
-        for process in as_completed(processes):
-            # Get its result and position
-            result, num = process.result()
+    Args:
+        matrix (list): Matrix to be printed
+    """
+    i = 1
+    for m in matrix:
+        print("#%i = %s" % (i, m))
+        i += 1
 
-            # Add result to results array in its respective position
-            results[num] = result
-
-            # Print position and result for debugging
-            print(num, result)
-
-    return results
 
 def calculate_result(matrix_1: np.ndarray, matrix_2: np.ndarray) -> np.ndarray:
     """
@@ -120,6 +112,14 @@ def calculate_result(matrix_1: np.ndarray, matrix_2: np.ndarray) -> np.ndarray:
     
     # Partition Matrix #2 into submatrices
     m2_results = partition(matrix_2)
+
+    # Print submatrices for Matrix #1
+    print("Submatrices for Random Matrix #1:")
+    print_matrix(m1_results)
+
+    # Print submatrices for Matrix #2
+    print("\nSubmatrices for Random Matrix #2:")
+    print_matrix(m2_results)
 
     # Use multiprocessing to multiply the partitioned matrices
     processes = processing(m1_results, m2_results)

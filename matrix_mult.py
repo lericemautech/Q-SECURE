@@ -92,9 +92,9 @@ def print_matrix(matrix: list) -> None:
     """
     i = 1
     for m in matrix:
+        # Print each submatrix and its index (starts at 1)
         print("#%i = %s" % (i, m))
         i += 1
-
 
 def calculate_result(matrix_1: np.ndarray, matrix_2: np.ndarray) -> np.ndarray:
     """

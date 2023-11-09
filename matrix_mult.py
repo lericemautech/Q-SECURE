@@ -83,18 +83,19 @@ def processing(m1_results: list, m2_results: list) -> list:
     # Multiply each submatrix async and in parallel, get the results, then return
     return [pool.apply_async(matrix_vector_mult, args = (m1_results[i], m2_results[i % VERTICAL_PARTITIONS])).get() for i in range(len(m1_results))]
 
-def print_matrix(matrix: list) -> None:
+def print_submatrices(submatrices: list) -> None:
     """
-    Prints given matrix
+    Prints each of the given submatrices
 
     Args:
-        matrix (list): Matrix to be printed
+        submatrices (list): Submatrices to be printed
     """
-    i = 1
-    for m in matrix:
-        # Print each submatrix and its index (starts at 1)
-        print("#%i = %s" % (i, m))
-        i += 1
+    # Print each submatrix separated by a newline
+    for submatrix in submatrices[:-1]:
+        print("%s\n" % submatrix)
+
+    # Print last submatrix without a newline
+    print("%s" % submatrices[-1])
 
 def calculate_result(matrix_1: np.ndarray, matrix_2: np.ndarray) -> np.ndarray:
     """
@@ -114,12 +115,14 @@ def calculate_result(matrix_1: np.ndarray, matrix_2: np.ndarray) -> np.ndarray:
     m2_results = partition(matrix_2)
 
     # Print submatrices for Matrix #1
-    print("Submatrices for Random Matrix #1:")
-    print_matrix(m1_results)
+    print("\nSTART:", len(m1_results), "SUBMATRICES FOR MATRIX #1")
+    print_submatrices(m1_results)
+    print("END:", len(m1_results), "SUBMATRICES FOR MATRIX #1\n")
 
     # Print submatrices for Matrix #2
-    print("\nSubmatrices for Random Matrix #2:")
-    print_matrix(m2_results)
+    print("START:", len(m2_results), "SUBMATRICES FOR MATRIX #2")
+    print_submatrices(m2_results)
+    print("END:", len(m2_results), "SUBMATRICES FOR MATRIX #2\n")
 
     # Use multiprocessing to multiply the partitioned matrices
     processes = processing(m1_results, m2_results)
@@ -158,10 +161,10 @@ def simulations() -> None:
     imports = "np, MIN, MAX, LENGTH"
     
     # Simulate calculations for each individual step in calculate_result()
-    print("Partition Matrix #1 Time =", round(timing(f"{partition_1}", f"{imports}, partition"), SIG_FIGS), "ms")
-    print("Partition Matrix #2 Time =", round(timing(f"{partition_2}", f"{imports}, partition"), SIG_FIGS), "ms")
-    print("Processing Time =", round(timing(f"{process_results}", f"{imports}, processing, partition"), SIG_FIGS), "ms")
-    print("Combine Results Time =", round(timing(f"combine_results({process_results})", f"{imports}, combine_results, processing, partition"), SIG_FIGS), "ms")
+    print("PARTITION MATRIX #1 TIME =", round(timing(f"{partition_1}", f"{imports}, partition"), SIG_FIGS), "MS")
+    print("PARTITION MATRIX #2 TIME =", round(timing(f"{partition_2}", f"{imports}, partition"), SIG_FIGS), "MS")
+    print("PROCESSING TIME =", round(timing(f"{process_results}", f"{imports}, processing, partition"), SIG_FIGS), "MS")
+    print("COMBINE RESULTS TIME =", round(timing(f"combine_results({process_results})", f"{imports}, combine_results, processing, partition"), SIG_FIGS), "MS")
 
     # Simulate calculations for each method of matrix multiplication
     c_time = timing(f"calculate_result({input})", f"{imports}, calculate_result")
@@ -169,15 +172,15 @@ def simulations() -> None:
     e_time = timing(f"np.einsum('ij,j->i', {input})", imports)
     
     # Print time calculations
-    print("\ncalculate_result() Time =", round(c_time, SIG_FIGS), "ms")
-    print("Matmul Calculation Time =", round(m_time, SIG_FIGS), "ms")
-    print("Einsum Calculation Time =", round(e_time, SIG_FIGS), "ms")
+    print("calculate_result() TIME =", round(c_time, SIG_FIGS), "MS")
+    print("matmul() TIME =", round(m_time, SIG_FIGS), "MS")
+    print("einsum() TIME =", round(e_time, SIG_FIGS), "MS")
     
     # Determine quickest calculation
     minimum = min(e_time, c_time, m_time)
-    if minimum == e_time: print("\nEinsum is %f ms faster than calculate_result()" % round(abs(c_time - e_time), SIG_FIGS))
-    elif minimum == m_time: print("\nMatmul is %f ms faster than calculate_result()" % round(abs(c_time - m_time), SIG_FIGS))
-    else: print("\ncalculate_result() is somehow the fastest")
+    if minimum == e_time: print("einsum() IS %f MS FASTER THAN calculate_result()\n" % round(abs(c_time - e_time), SIG_FIGS))
+    elif minimum == m_time: print("matmul() IS %f MS FASTER THAN calculate_result()\n" % round(abs(c_time - m_time), SIG_FIGS))
+    else: print("calculate_result() IS THE FASTEST\n")
     
 def print_results(c_result: np.ndarray, m_result: np.ndarray, e_result: np.ndarray) -> None:
     """
@@ -185,34 +188,26 @@ def print_results(c_result: np.ndarray, m_result: np.ndarray, e_result: np.ndarr
 
     Args:
         c_result (np.ndarray): Result from calculate_result()
-        m_result (np.ndarray): Result using Numpy's matmul()
-        e_result (np.ndarray): Result using Numpy's einsum()
+        m_result (np.ndarray): Result from matmul()
+        e_result (np.ndarray): Result from einsum()
     """
     # Print results
-    print("calculate_result() = %s\n" % c_result)
-    print("Matmul Result = %s\n" % m_result)
-    print("Einsum Result = %s\n" % e_result)
-    
-    # Confirm matmul and einsum results are equal since they're both the correct result
-    if not np.array_equal(m_result, e_result):
-        print("Matmul and einsum results are supposed to be equal. Something is very wrong here...\n")
-        exit(0)
+    print("calculate_result() = %s" % c_result)
+    print("matmul() = %s" % m_result)
+    print("einsum() = %s\n" % e_result)
          
 if __name__ == "__main__":
     # Generate random matrix of size LENGTH * LENGTH
     rand_mat1 = np.random.randint(MIN, MAX, size = (LENGTH, LENGTH))
-    print("Random Matrix #1 = %s\n" % rand_mat1)
+    print("MATRIX #1 = %s\n" % rand_mat1)
     
     # Generate random vector of size LENGTH
     rand_mat2 = np.random.randint(MIN, MAX, size = LENGTH)
-    print("Random Matrix #2 = %s\n" % rand_mat2)
+    print("MATRIX #2 = %s" % rand_mat2)
                 
     # Calculate threaded result
     c_result = calculate_result(rand_mat1, rand_mat2)
-
-    # Print c_results for debugging
-    print("\ncalculate_result(Random Matrix #1, Random Matrix #2) = %s" % c_result)
-    
+        
     # Calculate correct result using matmul
     m_result = rand_mat1 @ rand_mat2
     
@@ -227,8 +222,8 @@ if __name__ == "__main__":
 
     # Check if result is correct
     if np.array_equal(m_result, c_result):
-        print("\nCorrect Calculation!")
+        print("CORRECT CALCULATION!")
         exit(1)
     else:
-        print("\nIncorrect Calculation...")
+        print("INCORRECT CALCULATION...")
         exit(0)

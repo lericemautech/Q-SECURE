@@ -14,12 +14,8 @@ def calculate_result(matrix_1: ndarray, matrix_2: ndarray) -> ndarray:
     """
     # Create Manager to multiply the matrices with multiprocessing
     manager = Manager(matrix_1, matrix_2)
-
-    # TODO Fix manager.simulations()
-    # Simulate calculations
-    #manager.simulations(matrix_1, matrix_2)
     
-    return manager.get_results()
+    return manager.get_result()
     
 def print_results(c_result: ndarray, m_result: ndarray, e_result: ndarray) -> None:
     """

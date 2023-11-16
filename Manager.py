@@ -13,18 +13,24 @@ VERTICAL_PARTITIONS = 3
 SHOTS = 1
 SIG_FIGS = 5
 
-# TODO Fix simulations()
 # TODO Add Semaphore and/or Lock
 # TODO Add input validation
 # TODO try-except statements
+# TODO Include main as 1 of the processes (i.e. Workers)
 
 class Manager(ProcessPoolExecutor):
     def __init__(self, matrix_1: ndarray, matrix_2: ndarray, processes: int = N_WORKERS):
         super().__init__()
+        # Dict containing results from each process (matrix multi)
         self._results = { }
+
+        # Matrix #1 partitions
         self._m1_partitions = Manager.partition(self, matrix_1)
+
+        # Matrix #2 partitions
         self._m2_partitions = Manager.partition(self, matrix_2)
-        
+
+        # Make sure number of processes is valid
         if processes < 1 or processes > cpu_count():
             raise ValueError(f"Number of processes must be greater than 1 and less than or equal to the number of CPUs in the system, i.e. {cpu_count()}")
         self._process_count = processes
@@ -61,7 +67,7 @@ class Manager(ProcessPoolExecutor):
         # Split matrix horizontally
         sub_matrices = array_split(matrix, HORIZONTAL_PARTITIONS, axis = 0)
         
-        # Split submatrices vertically then return
+        # Split submatrices vertically, then return
         return [m for sub_matrix in sub_matrices for m in  array_split(sub_matrix, VERTICAL_PARTITIONS, axis = 1)]
 
     def allocate_work(self) -> None:
@@ -88,6 +94,8 @@ class Manager(ProcessPoolExecutor):
             ndarray: Combined result of given matrices
         """
         combined_results, end = [], 0
+
+        # Get all results from the queue, sorted by its position
         results = [value for _, value in sorted(self._results.items())]
 
         # Sum all values in the same row, then add to combined_results
@@ -98,7 +106,7 @@ class Manager(ProcessPoolExecutor):
         # Combine all results into a single matrix
         return concatenate(combined_results)
 
-    def get_results(self) -> ndarray:
+    def get_result(self) -> ndarray:
         """
         Get final result
 
@@ -139,68 +147,13 @@ class Manager(ProcessPoolExecutor):
         Manager.print_submatrices(self, self._m2_partitions)
         print("END:", len(self._m2_partitions), "SUBMATRICES FOR MATRIX #2\n")
 
-    def timing(self, func: str, setup: str, sims: int = SHOTS) -> float:
-        """
-        Define general timing function for simulations
-
-        Args:
-            func (str): Function to simulate
-            setup (str): Necessary imports and variables
-            sims (int, optional): Number of simulations; defaults to SHOTS
-
-        Returns:
-            float: Average calculation time (in milliseconds) for func after simulations
-        """
-        return timeit(func, f"from __main__ import {setup}", number = sims) * 1000
-
-    # TODO Fix this method
-    def simulations(self, matrix_1: ndarray, matrix_2: ndarray) -> None:
-        """
-        Runs simulations for each
-        (1) Individual step in get_results()
-        (2) Calculation type (i.e. get_results(), matmul(), einsum())
-        Prints their results, and determines the quickest calculation
-
-        Args:
-            matrix_1 (ndarray): Matrix #1 with length and width = LENGTH
-            matrix_2 (ndarray): Matrix #2 with length = LENGTH
-        """
-        # Import and input strings for timing
-        input = f"{matrix_1}, {matrix_2}"
-        partition_1 = f"partition({matrix_1})"
-        partition_2 = f"partition({matrix_2})"
-        process_results = f"allocate_work()"
-        imports = "numpy, MIN, MAX, LENGTH"
-        
-        # Simulate calculations for each individual step in calculate_result()
-        print("PARTITION MATRIX #1 TIME =", round(Manager.timing(self, f"{partition_1}", f"{imports}, partition"), SIG_FIGS), "MS")
-        print("PARTITION MATRIX #2 TIME =", round(Manager.timing(self, f"{partition_2}", f"{imports}, partition"), SIG_FIGS), "MS")
-        print("ALLOCATE WORK TIME =", round(Manager.timing(self, f"{process_results}", f"{imports}, processing, partition"), SIG_FIGS), "MS")
-        print("COMBINE RESULTS TIME =", round(Manager.timing(self, f"combine_results({process_results})", f"{imports}, combine_results, processing, partition"), SIG_FIGS), "MS")
-
-        # Simulate calculations for each method of matrix multiplication
-        c_time = Manager.timing(self, f"calculate_result({input})", f"{imports}, get_results")
-        m_time = Manager.timing(self, f"np.matmul({input})", imports)
-        e_time = Manager.timing(self, f"np.einsum('ij,j->i', {input})", imports)
-        
-        # Print time calculations
-        print("get_results() TIME =", round(c_time, SIG_FIGS), "MS")
-        print("matmul() TIME =", round(m_time, SIG_FIGS), "MS")
-        print("einsum() TIME =", round(e_time, SIG_FIGS), "MS")
-        
-        # Determine quickest calculation
-        minimum = min(e_time, c_time, m_time)
-        if minimum == e_time: print("einsum() IS %f MS FASTER THAN get_results()\n" % round(abs(c_time - e_time), SIG_FIGS))
-        elif minimum == m_time: print("matmul() IS %f MS FASTER THAN get_results()\n" % round(abs(c_time - m_time), SIG_FIGS))
-        else: print("get_results() IS THE FASTEST\n")
-
 # if __name__ == "__main__":
-#     # Partition Matrix #1 into submatrices
-#     m1_results = partition(np.random.randint(MIN, MAX, size = (LENGTH, LENGTH)))
+#     # Matrix #1
+#     matrix_1 = np.random.randint(MIN, MAX, size = (LENGTH, LENGTH))
     
-#     # Partition Matrix #2 into submatrices
-#     m2_results = partition(np.random.randint(MIN, MAX, size = LENGTH))
+#     # Matrix #2
+#     matrix_2 = np.random.randint(MIN, MAX, size = LENGTH)
 
-#     manager = Manager(m1_results, m2_results)
+#     manager = Manager(matrix_1, matrix_2)
     
-#     print(manager.get_results())
+#     print(manager.get_result())

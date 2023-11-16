@@ -14,6 +14,7 @@ SHOTS = 1
 SIG_FIGS = 5
 
 # TODO Fix simulations()
+# TODO Add Semaphore and/or Lock
 # TODO Add input validation
 # TODO try-except statements
 
@@ -38,7 +39,7 @@ class Manager(ProcessPoolExecutor):
         Returns:
             list[Worker]: List of processes
         """
-        workers = [ Worker() for _ in range(self._process_count) ]
+        workers = [Worker() for _ in range(self._process_count)]
         
         for worker in workers:
             worker.start()
@@ -113,8 +114,8 @@ class Manager(ProcessPoolExecutor):
         Returns:
             ndarray: Combined result of given matrices
         """
-        combined_results, end = [ ], 0
-        results = [ value for _, value in sorted(self._output.items())]
+        combined_results, end = [], 0
+        results = [value for _, value in sorted(self._output.items())]
 
         # Sum all values in the same row, then add to combined_results
         for i in range(0, len(results), VERTICAL_PARTITIONS):
@@ -134,7 +135,7 @@ class Manager(ProcessPoolExecutor):
         Manager.allocate_work(self)
         
         for i in range(len(self._m1_results)):
-            result, index = self._workers[i % N_WORKERS]._out_queue.get()
+            result, index = self._workers[i % self._process_count]._out_queue.get()
             self._output[index] = result
 
         return Manager.combine_results(self)
@@ -153,7 +154,7 @@ class Manager(ProcessPoolExecutor):
         """
         return timeit(func, f"from __main__ import {setup}", number = sims) * 1000
 
-    # TODO Fix this method:
+    # TODO Fix this method
     def simulations(self, matrix_1: ndarray, matrix_2: ndarray) -> None:
         """
         Runs simulations for each

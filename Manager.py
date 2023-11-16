@@ -1,5 +1,5 @@
 from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import Queue, cpu_count
+from multiprocessing import cpu_count
 from Worker import Worker, DONE
 from numpy import array_split, ndarray, concatenate
 from timeit import timeit
@@ -19,10 +19,9 @@ SIG_FIGS = 5
 # TODO try-except statements
 
 class Manager(ProcessPoolExecutor):
-    def __init__(self, matrix_1, matrix_2, processes: int = N_WORKERS):
+    def __init__(self, matrix_1: ndarray, matrix_2: ndarray, processes: int = N_WORKERS):
         super().__init__()
-        self._results = Queue()
-        self._output = { }
+        self._results = { }
         self._m1_partitions = Manager.partition(self, matrix_1)
         self._m2_partitions = Manager.partition(self, matrix_2)
         
@@ -89,7 +88,7 @@ class Manager(ProcessPoolExecutor):
             ndarray: Combined result of given matrices
         """
         combined_results, end = [], 0
-        results = [value for _, value in sorted(self._output.items())]
+        results = [value for _, value in sorted(self._results.items())]
 
         # Sum all values in the same row, then add to combined_results
         for i in range(0, len(results), VERTICAL_PARTITIONS):
@@ -110,7 +109,7 @@ class Manager(ProcessPoolExecutor):
         
         for i in range(len(self._m1_partitions)):
             result, index = self._workers[i % self._process_count]._out_queue.get()
-            self._output[index] = result
+            self._results[index] = result
 
         return Manager.combine_results(self)
 

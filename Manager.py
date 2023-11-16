@@ -23,8 +23,8 @@ class Manager(ProcessPoolExecutor):
         super().__init__()
         self._results = Queue()
         self._output = { }
-        self._m1_results = Manager.partition(self, matrix_1)
-        self._m2_results = Manager.partition(self, matrix_2)
+        self._m1_partitions = Manager.partition(self, matrix_1)
+        self._m2_partitions = Manager.partition(self, matrix_2)
         
         if processes < 1 or processes > cpu_count():
             raise ValueError(f"Number of processes must be greater than 1 and less than or equal to the number of CPUs in the system, i.e. {cpu_count()}")
@@ -65,39 +65,13 @@ class Manager(ProcessPoolExecutor):
         # Split submatrices vertically then return
         return [m for sub_matrix in sub_matrices for m in  array_split(sub_matrix, VERTICAL_PARTITIONS, axis = 1)]
 
-    def print_submatrices(self, submatrices: list) -> None:
-        """
-        Prints each of the given submatrices
-
-        Args:
-            submatrices (list): Submatrices to be printed
-        """
-        # Print each submatrix separated by a newline
-        for submatrix in submatrices[:-1]:
-            print("%s\n" % submatrix)
-
-        # Print last submatrix without a newline
-        print("%s" % submatrices[-1])
-
-    def debug_print(self) -> None:
-        """
-        Print submatrices (i.e. partitions) for debugging
-        """
-        print("\nSTART:", len(self._m1_results), "SUBMATRICES FOR MATRIX #1")
-        Manager.print_submatrices(self, self._m1_results)
-        print("END:", len(self._m1_results), "SUBMATRICES FOR MATRIX #1\n")
-
-        print("START:", len(self._m2_results), "SUBMATRICES FOR MATRIX #2")
-        Manager.print_submatrices(self, self._m2_results)
-        print("END:", len(self._m2_results), "SUBMATRICES FOR MATRIX #2\n")
-
     def allocate_work(self) -> None:
         """
         Allocated work for each process
         """
         # Putting an item in the workers queue will cause it to run
-        for i in range(len(self._m1_results)):
-            self._workers[i % self._process_count]._in_queue.put((self._m1_results[i], self._m2_results[i % VERTICAL_PARTITIONS], i))
+        for i in range(len(self._m1_partitions)):
+            self._workers[i % self._process_count]._in_queue.put((self._m1_partitions[i], self._m2_partitions[i % VERTICAL_PARTITIONS], i))
 
         # Finalize all workers
         for worker in self._workers:
@@ -134,11 +108,37 @@ class Manager(ProcessPoolExecutor):
         """
         Manager.allocate_work(self)
         
-        for i in range(len(self._m1_results)):
+        for i in range(len(self._m1_partitions)):
             result, index = self._workers[i % self._process_count]._out_queue.get()
             self._output[index] = result
 
         return Manager.combine_results(self)
+
+    def print_submatrices(self, submatrices: list) -> None:
+        """
+        Prints each of the given submatrices
+
+        Args:
+            submatrices (list): Submatrices to be printed
+        """
+        # Print each submatrix separated by a newline
+        for submatrix in submatrices[:-1]:
+            print("%s\n" % submatrix)
+
+        # Print last submatrix without a newline
+        print("%s" % submatrices[-1])
+
+    def debug_print(self) -> None:
+        """
+        Print submatrices (i.e. partitions) for debugging
+        """
+        print("\nSTART:", len(self._m1_partitions), "SUBMATRICES FOR MATRIX #1")
+        Manager.print_submatrices(self, self._m1_partitions)
+        print("END:", len(self._m1_partitions), "SUBMATRICES FOR MATRIX #1\n")
+
+        print("START:", len(self._m2_partitions), "SUBMATRICES FOR MATRIX #2")
+        Manager.print_submatrices(self, self._m2_partitions)
+        print("END:", len(self._m2_partitions), "SUBMATRICES FOR MATRIX #2\n")
 
     def timing(self, func: str, setup: str, sims: int = SHOTS) -> float:
         """

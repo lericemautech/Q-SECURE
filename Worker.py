@@ -43,4 +43,4 @@ class Worker(Process):
             # Add result to output queue
             self._out_queue.put(result)
             
-            #print(f"Worker {self.pid} result = {result}, index = {index}", flush = True)
+            print(f"Worker {self.pid} result = {result[0]}, index = {index}", flush = True)

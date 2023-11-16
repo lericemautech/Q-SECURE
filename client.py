@@ -1,27 +1,32 @@
+# matrix_client.py
 import socket
+import pickle
+import numpy as np
 
-HOST = socket.gethostname() # Raspberry Pi's IP address
-PORT = 12345
+def send_matrices(server_address, matrix_a, matrix_b):
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect(server_address)
 
-def send(sock, msg):
-    sock.send(msg.encode())
+    matrices = {'matrix_a': matrix_a, 'matrix_b': matrix_b}
+    client_socket.send(pickle.dumps(matrices))
 
-def receive(socket, msg):
-    pass
+    data = client_socket.recv(4096)
+    result_matrix = pickle.loads(data)
 
-def connect():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        try:
-            sock.connect((HOST, PORT))
-            print(sock.recv(1024).decode())
-
-        except socket.error as msg:
-            sock.close()
-            print("ERROR: %s\n" % msg)
-            exit(1)
-
-        finally:
-            sock.close()
+    client_socket.close()
+    return result_matrix
 
 if __name__ == "__main__":
-    print("Starting client...")
+    # Example matrices for testing
+    matrix_a = np.random.rand(2, 2)
+    matrix_b = np.random.rand(2, 2)
+
+    server_address = ('127.0.0.1', 12345)
+    result = send_matrices(server_address, matrix_a, matrix_b)
+
+    print("Matrix A:")
+    print(matrix_a)
+    print("\nMatrix B:")
+    print(matrix_b)
+    print("\nResult Matrix:")
+    print(result)

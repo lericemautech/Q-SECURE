@@ -1,42 +1,33 @@
-from multiprocessing import Process, JoinableQueue
+from multiprocessing import Process, Queue
+from numpy import ndarray
 
-# States
-INIT = "INIT"
-RUN = "RUN"
-IDLE = "IDLE"
+# State
 DONE = "DONE"
 
 class Worker(Process):
     def __init__(self, daemon = True):
         super().__init__(daemon = daemon)
-        self._state: str = INIT
-        self._in_queue = JoinableQueue()
-        self._out_queue = JoinableQueue()
+        self._in_queue = Queue()
+        self._out_queue = Queue()
 
-    def run(self):
-            print(f"Worker {self.pid} starting", flush = True)
-            self.state = RUN
-            # Blocks until something available, exits when receiving "DONE"
-            for arg in iter(self._in_queue.get, DONE):
-                # Perform work (with arg?)
-                print(arg)
-                #self._in_queue.task_done()
-            self.state = DONE
-            print("fWorker {self.pid} ending", flush = True)
-            self.state = IDLE
-
-    @property
-    def state(self) -> str:
+    def matrix_vector_mult(self, matrix_1: ndarray, matrix_2: ndarray, index: int) -> tuple[ndarray, int]:
         """
-        Worker's state
+        Multiply 2 matrices
+
+        Args:
+            matrix_1 (ndarray): Matrix #1
+            matrix_2 (ndarray): Matrix #2
+            index (_type_): Matrix position
 
         Returns:
-            str: Worker's current state
+            tuple[ndarray, int]: Multiple of matrix_1 and matrix_2, index
         """
-        return self._state
+        return matrix_1 @ matrix_2, index
 
-    @state.setter
-    def state(self, state: str):
-        if state not in [INIT, RUN, DONE, IDLE]:
-            raise ValueError(f"Invalid state: {state}")
-        self._state = state
+    def run(self) -> None:
+        # Blocks until something available, exits when receiving "DONE"
+        for arg in iter(self._in_queue.get, DONE):
+            matrix_1, matrix_2, index = arg
+            result = Worker.matrix_vector_mult(self, matrix_1, matrix_2, index)
+            self._out_queue.put(result)
+            #print(f"Worker {self.pid} result = {result}, index = {index}", flush = True)

@@ -1,17 +1,15 @@
 import numpy as np
-from Worker import Worker
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from timeit import timeit
-from multiprocessing import Pool, Queue
 
 LENGTH = 9
 HORIZONTAL_PARTITIONS = 3
 VERTICAL_PARTITIONS = 3
-CHUNKS = 1
 MIN = 0
 MAX = 5
 SHOTS = 1
 SIG_FIGS = 5
-N_POOLS = 4
+N_WORKERS = 4
 
 # TODO Add input validation
 # TODO try-except statements
@@ -35,21 +33,21 @@ def partition(matrix: np.ndarray) -> list:
     # Split submatrices vertically then return
     return [m for sub_matrix in sub_matrices for m in  np.array_split(sub_matrix, VERTICAL_PARTITIONS, axis = 1)]
 
-def matrix_vector_mult(matrix_1: np.ndarray, matrix_2: np.ndarray) -> np.ndarray:
+def matrix_vector_mult(matrix_1: np.ndarray, matrix_2: np.ndarray, index: int) -> tuple:
     """
     Multiply 2 matrices
 
     Args:
         matrix_1 (np.ndarray): Matrix #1
         matrix_2 (np.ndarray): Matrix #2
+        index (int): Matrix position
 
     Returns:
-        np.ndarray: Result of multiplying Matrix #1 and Matrix #2
+        tuple: Result of multiplying Matrix #1 and Matrix #2, and its index
     """
-    return matrix_1 @ matrix_2
+    return matrix_1 @ matrix_2, index
 
-
-def combine_results(results: list) -> np.ndarray:
+def combine_results(results: np.ndarray) -> np.ndarray:
     """
     Combines all separate submatrices into a single matrix
 
@@ -69,34 +67,7 @@ def combine_results(results: list) -> np.ndarray:
     # Combine all results into a single matrix
     return np.concatenate(combined_results)
 
-def matrix_vector_mult_2(in_queue: Queue, out_queue: Queue) -> None:
-    """
-    Multiply 2 matrices
-
-    Args:
-        in_queue (Queue): Queue containing 
-        out_queue (Queue): _description_
-    """
-    out_queue.put(in_queue.get()[0] @ in_queue.get()[1])
-
-def init_queue(m1_results: list, m2_results: list) -> Queue:
-    """
-    _summary_
-
-    Args:
-        m1_results (list): Matrix #1 partitioned into submatrices
-        m2_results (list): Matrix #2 partitioned into submatrices
-
-    Returns:
-        Queue: _description_
-    """
-    queue = Queue()
-    for i in range(len(m1_results)):
-        queue.put((m1_results[i], m2_results[i % VERTICAL_PARTITIONS]))
-        
-    return queue
-
-def processing(m1_results: list, m2_results: list) -> list:
+def processing(m1_results: list, m2_results: list) -> np.ndarray:
     """
     Uses multiprocessing to multiply partitioned matrices
 
@@ -105,27 +76,21 @@ def processing(m1_results: list, m2_results: list) -> list:
         m2_results (list): Matrix #2 partitioned into submatrices
 
     Returns:
-        list: List of results from each process
-    """
-    in_queue = init_queue(m1_results, m2_results)
-    out_queue = Queue()
+        np.ndarray: Array of results from each process
+    """    
+    processes, results, num = [ ], np.empty(len(m1_results), dtype = np.ndarray), 0
 
-    worker_dict = {i : Worker(target = matrix_vector_mult_2, args = (in_queue, out_queue)) for i in range(N_POOLS)}
-    for _, worker in worker_dict.items():
-        worker.start()
+    with ProcessPoolExecutor(N_WORKERS) as manager:
+        for i in range(len(m1_results)):
+            to_be_executed = manager.submit(matrix_vector_mult, m1_results[i], m2_results[i % VERTICAL_PARTITIONS], num)
+            processes.append(to_be_executed)
+            num += 1
 
-        # Putting an item in the workers queue will cause it to run
-        worker._queue.put(in_queue.get())
+        for process in as_completed(processes):
+            result, num = process.result()
+            results[num] = result
 
-        print(worker._queue.get())
-
-    # Create Pool of N_POOLS processes
-    pool = Pool(processes = N_POOLS)
-  
-    # Multiply each submatrix async and in parallel, get the results, then return
-    x =  [pool.apply_async(matrix_vector_mult, args = (m1_results[i], m2_results[i % VERTICAL_PARTITIONS])).get() for i in range(len(m1_results))]
-    print("real", x)
-    return x
+    return results
 
 def print_submatrices(submatrices: list) -> None:
     """

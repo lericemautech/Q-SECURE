@@ -1,90 +1,42 @@
-from multiprocessing import Process, Queue
+from multiprocessing import Process, JoinableQueue
 
 # States
 INIT = "INIT"
 RUN = "RUN"
-CLOSE = "CLOSE"
-TERMINATE = "TERMINATE"
-STOP = "STOP"
-
-# Number of processes
-N_POOLS = 4
+IDLE = "IDLE"
+DONE = "DONE"
 
 class Worker(Process):
-    def __init__(self, target, args = (), kwargs = {}, name = str(), daemon = True):
-        """
-        Initialize Worker
-
-        Args:
-            target: Function to execute
-            args: Arguments to pass to function; defaults to ()
-            kwargs: Keyword arguments to pass to function; defaults to {}
-            name: Process name; defaults to empty string
-            daemon: Whether process is daemon or not; defaults to True
-        """
-        #Process.__init__(self, target = target, args = args, kwargs = kwargs, name = name, daemon = daemon)
-        super(Worker, self).__init__(target = target, args = args, kwargs = kwargs, name = name, daemon = daemon)
-        self._target = target
-        self._args = tuple(args)
-        self._kwargs = dict(kwargs)
-        self._name = str(name)
-        self._daemon = daemon
-        self._queue = Queue()
-        self._result = None
-        self._state = INIT
+    def __init__(self, daemon = True):
+        super().__init__(daemon = daemon)
+        self._state: str = INIT
+        self._in_queue = JoinableQueue()
+        self._out_queue = JoinableQueue()
 
     def run(self):
-        """
-        Run process
-        """
-        self._state = RUN
-        while not self._queue.empty():
-            self._target(*self._args)
-            #self._target(*self._queue.get())
-        self._state = CLOSE
-
-        # for arg in iter(self._queue.get, STOP):
-        #     self._target(*arg)
-            
-        # self._state = RUN
-        # self._result = self._target(*self._args, **self._kwargs)
-        # self._state = CLOSE
+            print(f"Worker {self.pid} starting", flush = True)
+            self.state = RUN
+            # Blocks until something available, exits when receiving "DONE"
+            for arg in iter(self._in_queue.get, DONE):
+                # Perform work (with arg?)
+                print(arg)
+                #self._in_queue.task_done()
+            self.state = DONE
+            print("fWorker {self.pid} ending", flush = True)
+            self.state = IDLE
 
     @property
-    def result(self):
+    def state(self) -> str:
         """
-        Get result of process
+        Worker's state
 
         Returns:
-            Any: Process result
+            str: Worker's current state
         """
-        return self._result
+        return self._state
 
-    @property
-    def name(self) -> str:
-        """
-        String used for process identification
-
-        Returns:
-            str: Process name
-        """
-        return self._name
-
-    @name.setter
-    def name(self, name: str):
-        """
-        Set process name
-
-        Args:
-            name (str): Process name
-        """
-        self._name = name
-
-    def is_alive(self) -> bool:
-        """
-        Checks if process is alive or not
-
-        Returns:
-            bool: True if process is alive, else False
-        """
-        return super().is_alive()
+    @state.setter
+    def state(self, state: str):
+        if state not in [INIT, RUN, DONE, IDLE]:
+            raise ValueError(f"Invalid state: {state}")
+        self._state = state

@@ -42,7 +42,7 @@ if __name__ == "__main__":
     
     # Generate random vector of size LENGTH
     rand_mat2 = random.randint(MIN, MAX, size = LENGTH)
-    print("MATRIX #2 = %s" % rand_mat2)
+    print("MATRIX #2 = %s\n" % rand_mat2)
                 
     # Calculate threaded result
     c_result = calculate_result(rand_mat1, rand_mat2)

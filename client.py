@@ -83,7 +83,7 @@ def send_matrices(server_address: tuple[str, int], matrix_a_partitions: list, ma
     except error as msg:
         client_socket.close()
         print("ERROR: %s\n" % msg)
-        exit(1)
+        exit(0)
 
 if __name__ == "__main__":
     # Example matrices for testing

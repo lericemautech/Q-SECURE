@@ -43,7 +43,7 @@ def handle_client(client_socket: socket) -> None:
     except error as msg:
         client_socket.close()
         print("ERROR: %s\n" % msg)
-        exit(1)
+        exit(0)
 
 def start_server() -> None:
     """
@@ -63,7 +63,7 @@ def start_server() -> None:
     except error as msg:
         server_socket.close()
         print("ERROR: %s\n" % msg)
-        exit(1)
+        exit(0)
 
 if __name__ == "__main__":
     start_server()

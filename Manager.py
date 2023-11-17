@@ -2,7 +2,6 @@ from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import cpu_count
 from Worker import Worker, DONE
 from numpy import array_split, ndarray, concatenate
-from timeit import timeit
 
 LENGTH = 9
 MIN = 0
@@ -10,10 +9,7 @@ MAX = 5
 N_WORKERS = 4
 HORIZONTAL_PARTITIONS = 3
 VERTICAL_PARTITIONS = 3
-SHOTS = 1
-SIG_FIGS = 5
 
-# TODO Add Semaphore and/or Lock
 # TODO Add input validation
 # TODO try-except statements
 # TODO Include main as 1 of the processes (i.e. Workers)
@@ -76,11 +72,11 @@ class Manager(ProcessPoolExecutor):
         """
         # Putting an item in the workers queue will cause it to run
         for i in range(len(self._m1_partitions)):
-            self._workers[i % self._process_count]._in_queue.put((self._m1_partitions[i], self._m2_partitions[i % VERTICAL_PARTITIONS], i))
+            self._workers[i % self._process_count].in_queue.put((self._m1_partitions[i], self._m2_partitions[i % VERTICAL_PARTITIONS], i))
 
         # Finalize all workers
         for worker in self._workers:
-            worker._in_queue.put(DONE)
+            worker.in_queue.put(DONE)
 
         # Join all workers
         for worker in self._workers:
@@ -116,44 +112,20 @@ class Manager(ProcessPoolExecutor):
         Manager.allocate_work(self)
         
         for i in range(len(self._m1_partitions)):
-            result, index = self._workers[i % self._process_count]._out_queue.get()
+            result, index = self._workers[i % self._process_count].out_queue.get()
             self._results[index] = result
 
         return Manager.combine_results(self)
 
-    def print_submatrices(self, submatrices: list) -> None:
-        """
-        Prints each of the given submatrices
-
-        Args:
-            submatrices (list): Submatrices to be printed
-        """
-        # Print each submatrix separated by a newline
-        for submatrix in submatrices[:-1]:
-            print("%s\n" % submatrix)
-
-        # Print last submatrix without a newline
-        print("%s" % submatrices[-1])
-
-    def debug_print(self) -> None:
-        """
-        Print submatrices (i.e. partitions) for debugging
-        """
-        print("\nSTART:", len(self._m1_partitions), "SUBMATRICES FOR MATRIX #1")
-        Manager.print_submatrices(self, self._m1_partitions)
-        print("END:", len(self._m1_partitions), "SUBMATRICES FOR MATRIX #1\n")
-
-        print("START:", len(self._m2_partitions), "SUBMATRICES FOR MATRIX #2")
-        Manager.print_submatrices(self, self._m2_partitions)
-        print("END:", len(self._m2_partitions), "SUBMATRICES FOR MATRIX #2\n")
-
 # if __name__ == "__main__":
 #     # Matrix #1
-#     matrix_1 = np.random.randint(MIN, MAX, size = (LENGTH, LENGTH))
+#     matrix_1 = random.randint(MIN, MAX, size = (LENGTH, LENGTH))
     
 #     # Matrix #2
-#     matrix_2 = np.random.randint(MIN, MAX, size = LENGTH)
+#     matrix_2 = random.randint(MIN, MAX, size = LENGTH)
 
 #     manager = Manager(matrix_1, matrix_2)
     
-#     print(manager.get_result())
+#     print("\nResult =", manager.get_result())
+
+#     print("\nTrue Result =", matrix_1 @ matrix_2)

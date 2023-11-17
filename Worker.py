@@ -1,5 +1,6 @@
 from multiprocessing import Process, Queue
 from numpy import ndarray
+from datetime import datetime
 
 # State
 DONE = "DONE"
@@ -43,4 +44,24 @@ class Worker(Process):
             # Add result to output queue
             self._out_queue.put(result)
             
-            print(f"Worker {self.pid} result = {result[0]}, index = {index}", flush = True)
+            print(f"Worker {self.pid} result = {result[0]}, index = {index}, time = {datetime.now().time()}", flush = True)
+
+    @property
+    def in_queue(self) -> Queue:
+        """
+        Get input queue
+
+        Returns:
+            Queue: Input queue
+        """
+        return self._in_queue
+
+    @property
+    def out_queue(self) -> Queue:
+        """
+        Get output queue
+
+        Returns:
+            Queue: Output queue
+        """
+        return self._out_queue

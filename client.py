@@ -1,4 +1,4 @@
-from socket import socket, AF_INET, SOCK_STREAM
+from socket import socket, AF_INET, SOCK_STREAM, error
 from pickle import loads, dumps
 from numpy import ndarray, random, array_split, array_equal, concatenate
 
@@ -70,15 +70,20 @@ def send_matrices(server_address: tuple[str, int], matrix_a_partitions: list, ma
     """
     results = [ ]
     client_socket = socket(AF_INET, SOCK_STREAM)
-    client_socket.connect(server_address)
+    
+    try:
+        client_socket.connect(server_address)
+        matrices = {'matrix_a': matrix_a_partitions, 'matrix_b': matrix_b_partitions}
+        client_socket.send(dumps(matrices))
+        data = client_socket.recv(BUFFER)
+        results = loads(data)
+        client_socket.close()
+        return results
 
-    matrices = {'matrix_a': matrix_a_partitions, 'matrix_b': matrix_b_partitions}
-    client_socket.send(dumps(matrices))
-    data = client_socket.recv(BUFFER)
-    results = loads(data)
-
-    client_socket.close()
-    return results
+    except error as msg:
+        client_socket.close()
+        print("ERROR: %s\n" % msg)
+        exit(1)
 
 if __name__ == "__main__":
     # Example matrices for testing

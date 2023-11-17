@@ -1,4 +1,4 @@
-from socket import socket, AF_INET, SOCK_STREAM
+from socket import socket, AF_INET, SOCK_STREAM, error
 from pickle import loads, dumps
 from numpy import dot, ndarray
 
@@ -29,28 +29,41 @@ def handle_client(client_socket: socket) -> None:
         client_socket (socket): Client socket
     """
     results = { }
-    data = client_socket.recv(BUFFER)
-    matrices = loads(data)
-    matrix_a_partitions, matrix_b_partitions = matrices["matrix_a"], matrices["matrix_b"]
-    for i in range(len(matrix_a_partitions)):
-        results[i] = multiply_matrices(matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS])
-    print(f"These are the results: {results}\n")
-    client_socket.send(dumps(results))
-    client_socket.close()
+
+    try:
+        data = client_socket.recv(BUFFER)
+        matrices = loads(data)
+        matrix_a_partitions, matrix_b_partitions = matrices["matrix_a"], matrices["matrix_b"]
+        for i in range(len(matrix_a_partitions)):
+            results[i] = multiply_matrices(matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS])
+        print(f"These are the results: {results}\n")
+        client_socket.send(dumps(results))
+        client_socket.close()
+
+    except error as msg:
+        client_socket.close()
+        print("ERROR: %s\n" % msg)
+        exit(1)
 
 def start_server() -> None:
     """
     Start server and listen for connections
     """
     server_socket = socket(AF_INET, SOCK_STREAM)
-    server_socket.bind((HOST, PORT))
-    server_socket.listen(TIMEOUT)
-    print(f"Server listening on Port {PORT}...")
+    try:
+        server_socket.bind((HOST, PORT))
+        server_socket.listen(TIMEOUT)
+        print(f"Server listening on Port {PORT}...")
 
-    while True:
-        client_socket, addr = server_socket.accept()
-        print(f"Accepted connection from {addr}\n")
-        handle_client(client_socket)
+        while True:
+            client_socket, addr = server_socket.accept()
+            print(f"Accepted connection from {addr}\n")
+            handle_client(client_socket)
+
+    except error as msg:
+        server_socket.close()
+        print("ERROR: %s\n" % msg)
+        exit(1)
 
 if __name__ == "__main__":
     start_server()

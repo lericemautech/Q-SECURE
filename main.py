@@ -1,5 +1,5 @@
-from numpy import ndarray, array_equal, random
-from Manager import Manager, LENGTH, MIN, MAX
+from numpy import ndarray, random
+from Manager import Manager, verify, LENGTH, MIN, MAX
 
 def calculate_result(matrix_1: ndarray, matrix_2: ndarray) -> ndarray:
     """
@@ -14,7 +14,7 @@ def calculate_result(matrix_1: ndarray, matrix_2: ndarray) -> ndarray:
     """
     # Create Manager to multiply the matrices with multiprocessing
     manager = Manager(matrix_1, matrix_2)
-    
+
     return manager.get_result()
     
 def print_results(c_result: ndarray, m_result: ndarray, e_result: ndarray) -> None:
@@ -53,9 +53,10 @@ if __name__ == "__main__":
     #print_results(c_result, m_result, e_result)
 
     # Check if result is correct
-    if array_equal(m_result, c_result):
+    if verify(c_result, m_result):
         print("\nCORRECT CALCULATION!")
         exit(1)
+
     else:
         print("\nINCORRECT CALCULATION...")
         exit(0)

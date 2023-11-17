@@ -1,7 +1,7 @@
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import cpu_count
 from Worker import Worker, DONE
-from numpy import array_split, ndarray, concatenate
+from numpy import array_split, ndarray, concatenate, random, array_equal
 
 LENGTH = 9
 MIN = 0
@@ -117,15 +117,33 @@ class Manager(ProcessPoolExecutor):
 
         return Manager.combine_results(self)
 
-# if __name__ == "__main__":
-#     # Matrix #1
-#     matrix_1 = random.randint(MIN, MAX, size = (LENGTH, LENGTH))
-    
-#     # Matrix #2
-#     matrix_2 = random.randint(MIN, MAX, size = LENGTH)
+def verify(result: ndarray, check: ndarray) -> bool:
+    """
+    Confirm result's correctness
 
-#     manager = Manager(matrix_1, matrix_2)
-    
-#     print("\nResult =", manager.get_result())
+    Args:
+        result (ndarray): Calculated result
+        check (ndarray): Numpy's result
 
-#     print("\nTrue Result =", matrix_1 @ matrix_2)
+    Returns:
+        bool: True if correct, False otherwise
+    """
+    return array_equal(result, check)
+
+if __name__ == "__main__":
+    # Matrix #1
+    matrix_1 = random.randint(MIN, MAX, size = (LENGTH, LENGTH))
+    
+    # Matrix #2
+    matrix_2 = random.randint(MIN, MAX, size = LENGTH)
+
+    # Create Manager to multiply the matrices with multiprocessing
+    manager = Manager(matrix_1, matrix_2)
+
+    if verify(manager.get_result(), matrix_1 @ matrix_2):
+        print("\nCORRECT CALCULATION!")
+        exit(1)
+
+    else:
+        print("\nINCORRECT CALCULATION...")
+        exit(0)

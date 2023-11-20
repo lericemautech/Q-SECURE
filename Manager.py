@@ -4,7 +4,7 @@ from Worker import Worker, DONE
 from numpy import array_split, ndarray, concatenate, random, array_equal
 
 LENGTH = 9
-MATRIX_2_WIDTH = 2
+MATRIX_2_WIDTH = 1
 MIN = 0
 MAX = 5
 N_WORKERS = 4

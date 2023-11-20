@@ -1,5 +1,5 @@
-from numpy import ndarray, random
-from Manager import Manager, verify, LENGTH, MIN, MAX
+from numpy import ndarray
+from Manager import Manager, print_outcome, generate_matrix, LENGTH, MATRIX_2_WIDTH
 
 def calculate_result(matrix_1: ndarray, matrix_2: ndarray) -> ndarray:
     """
@@ -33,12 +33,10 @@ def print_results(c_result: ndarray, m_result: ndarray, e_result: ndarray) -> No
          
 if __name__ == "__main__":
     # Generate random matrix of size LENGTH * LENGTH
-    rand_mat1 = random.randint(MIN, MAX, size = (LENGTH, LENGTH))
-    print("MATRIX #1 = %s\n" % rand_mat1)
-    
-    # Generate random vector of size LENGTH
-    rand_mat2 = random.randint(MIN, MAX, size = LENGTH)
-    print("MATRIX #2 = %s\n" % rand_mat2)
+    rand_mat1 = generate_matrix(LENGTH, LENGTH)
+        
+    # Generate random matrix of size LENGTH * MATRIX_2_WIDTH
+    rand_mat2 = generate_matrix(LENGTH, MATRIX_2_WIDTH)
                 
     # Calculate threaded result
     c_result = calculate_result(rand_mat1, rand_mat2)
@@ -52,11 +50,5 @@ if __name__ == "__main__":
     # Print results
     #print_results(c_result, m_result, e_result)
 
-    # Check if result is correct
-    if verify(c_result, m_result):
-        print("\nCORRECT CALCULATION!")
-        exit(1)
-
-    else:
-        print("\nINCORRECT CALCULATION...")
-        exit(0)
+    # Print outcome
+    print_outcome(c_result, m_result)

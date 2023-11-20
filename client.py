@@ -14,24 +14,36 @@ VERTICAL_PARTITIONS = 2
 MIN = 0
 MAX = 5
 
-def partition(matrix: ndarray) -> list:
+def partition_m1(matrix: ndarray) -> list:
     """
-    Partition matrix into submatrices
+    Partition Matrix #1 into submatrices
 
     Args:
-        matrix (ndarray): Matrix to be partitioned
+        matrix (ndarray): Matrix #1 to be partitioned
 
     Returns:
-        list: Partitioned matrix
+        list: Partitioned Matrix #1
     """
     # Check if matrix is 1D (i.e. vector)
-    if matrix.ndim == 1: return array_split(matrix, VERTICAL_PARTITIONS, axis = 0)
-
+    if matrix.ndim == 1: return partition_m2(matrix)
+    
     # Split matrix horizontally
     sub_matrices = array_split(matrix, HORIZONTAL_PARTITIONS, axis = 0)
     
     # Split submatrices vertically, then return
     return [m for sub_matrix in sub_matrices for m in  array_split(sub_matrix, VERTICAL_PARTITIONS, axis = 1)]
+
+def partition_m2(matrix: ndarray) -> list:
+    """
+    Partition Matrix #2 into submatrices
+
+    Args:
+        matrix (ndarray): Matrix #2 to be partitioned
+
+    Returns:
+        list: Partitioned Matrix #2
+    """
+    return array_split(matrix, VERTICAL_PARTITIONS, axis = 0)
 
 def combine_results(matrices: dict) -> ndarray:
     """
@@ -90,8 +102,8 @@ if __name__ == "__main__":
     matrix_a = random.randint(MIN, MAX, size = (LENGTH, LENGTH))
     matrix_b = random.randint(MIN, MAX, size = LENGTH)
 
-    matrix_a_partitions = partition(matrix_a)
-    matrix_b_partitions = partition(matrix_b)
+    matrix_a_partitions = partition_m1(matrix_a)
+    matrix_b_partitions = partition_m2(matrix_b)
 
     server_address = (HOST, PORT)
     result = send_matrices(server_address, matrix_a_partitions, matrix_b_partitions)

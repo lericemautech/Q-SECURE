@@ -51,6 +51,7 @@ def start_server() -> None:
     """
     server_socket = socket(AF_INET, SOCK_STREAM)
     try:
+        server_socket.settimeout(TIMEOUT)
         server_socket.bind((HOST, PORT))
         server_socket.listen(TIMEOUT)
         print(f"Server listening on Port {PORT}...")

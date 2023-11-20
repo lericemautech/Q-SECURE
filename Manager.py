@@ -4,6 +4,7 @@ from Worker import Worker, DONE
 from numpy import array_split, ndarray, concatenate, random, array_equal
 
 LENGTH = 9
+MATRIX_2_WIDTH = 1
 MIN = 0
 MAX = 5
 N_WORKERS = 4
@@ -21,10 +22,10 @@ class Manager(ProcessPoolExecutor):
         self._results = { }
 
         # Matrix #1 partitions
-        self._m1_partitions = Manager.partition(self, matrix_1)
+        self._m1_partitions = Manager.partition_m1(self, matrix_1)
 
         # Matrix #2 partitions
-        self._m2_partitions = Manager.partition(self, matrix_2)
+        self._m2_partitions = Manager.partition_m2(self, matrix_2)
 
         # Make sure number of processes is valid
         if processes < 1 or processes > cpu_count():
@@ -47,24 +48,36 @@ class Manager(ProcessPoolExecutor):
 
         return workers
 
-    def partition(self, matrix: ndarray) -> list:
+    def partition_m1(self, matrix: ndarray) -> list:
         """
-        Partition matrix into submatrices
+        Partition Matrix #1 into submatrices
 
         Args:
-            matrix (ndarray): Matrix to be partitioned
+            matrix (ndarray): Matrix #1 to be partitioned
 
         Returns:
-            list: Partitioned matrix
+            list: Partitioned Matrix #1
         """
         # Check if matrix is 1D (i.e. vector)
-        if matrix.ndim == 1: return array_split(matrix, VERTICAL_PARTITIONS, axis = 0)
-
+        if matrix.ndim == 1: return Manager.partition_m2(self, matrix)
+        
         # Split matrix horizontally
         sub_matrices = array_split(matrix, HORIZONTAL_PARTITIONS, axis = 0)
         
         # Split submatrices vertically, then return
         return [m for sub_matrix in sub_matrices for m in  array_split(sub_matrix, VERTICAL_PARTITIONS, axis = 1)]
+
+    def partition_m2(self, matrix: ndarray) -> list:
+        """
+        Partition Matrix #2 into submatrices
+
+        Args:
+            matrix (ndarray): Matrix #2 to be partitioned
+
+        Returns:
+            list: Partitioned Matrix #2
+        """
+        return array_split(matrix, VERTICAL_PARTITIONS, axis = 0)
 
     def allocate_work(self) -> None:
         """
@@ -119,7 +132,7 @@ class Manager(ProcessPoolExecutor):
 
 def verify(result: ndarray, check: ndarray) -> bool:
     """
-    Confirm result's correctness
+    Checks if result is correct
 
     Args:
         result (ndarray): Calculated result
@@ -130,20 +143,44 @@ def verify(result: ndarray, check: ndarray) -> bool:
     """
     return array_equal(result, check)
 
-if __name__ == "__main__":
-    # Matrix #1
-    matrix_1 = random.randint(MIN, MAX, size = (LENGTH, LENGTH))
-    
-    # Matrix #2
-    matrix_2 = random.randint(MIN, MAX, size = LENGTH)
+def generate_matrix(length: int, width: int) -> ndarray:
+    """
+    Generates a random matrix of size length * width
 
-    # Create Manager to multiply the matrices with multiprocessing
-    manager = Manager(matrix_1, matrix_2)
+    Args:
+        length (int): Length of matrix
+        width (int): Width of matrix
 
-    if verify(manager.get_result(), matrix_1 @ matrix_2):
+    Returns:
+        ndarray: Random matrix of size length * width
+    """
+    return random.randint(MIN, MAX, size = (length, width))
+
+def print_outcome(result: ndarray, check: ndarray) -> None:
+    """
+    Prints calculation's outcome (i.e. correctness)
+
+    Args:
+        result (ndarray): Calculated result
+        check (ndarray): Numpy's result
+    """
+    if verify(result, check):
         print("\nCORRECT CALCULATION!")
         exit(1)
 
     else:
         print("\nINCORRECT CALCULATION...")
         exit(0)
+
+if __name__ == "__main__":
+    # Matrix #1
+    matrix_1 = generate_matrix(LENGTH, LENGTH)
+    
+    # Matrix #2
+    matrix_2 = generate_matrix(LENGTH, MATRIX_2_WIDTH)
+
+    # Create Manager to multiply the matrices with multiprocessing
+    manager = Manager(matrix_1, matrix_2)
+
+    # Print outcome
+    print_outcome(manager.get_result(), matrix_1 @ matrix_2)

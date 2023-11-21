@@ -158,7 +158,7 @@ class Client():
             # Catch exception
             except error as msg:
                 print("ERROR: %s" % msg)
-                exit(0)
+                exit(1)
 
 def verify(result: ndarray, check: ndarray) -> bool:
     """
@@ -196,14 +196,14 @@ def print_outcome(result: ndarray, check: ndarray) -> None:
     """
     if verify(result, check):
         print("CORRECT CALCULATION!")
-        exit(1)
+        exit(0)
 
     else:
         print("INCORRECT CALCULATION...")
-        exit(0)
+        exit(1)
 
 if __name__ == "__main__":
-    # Example matrices for testing
+    # Generate example matrices for testing
     matrix_a = generate_matrix(LENGTH, LENGTH)
     matrix_b = generate_matrix(LENGTH, MATRIX_2_WIDTH)
 

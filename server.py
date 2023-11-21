@@ -1,70 +1,76 @@
-from socket import socket, AF_INET, SOCK_STREAM, error
+from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
 from numpy import dot, ndarray
+from Client import BUFFER, PORTS, HOST, TIMEOUT
 
-HOST = "127.0.0.1"
-PORT = 12345
-TIMEOUT = 5
-BUFFER = 4096
-VERTICAL_PARTITIONS = 2
+class Server:
+    def __init__(self, port: int, host: str = HOST, timeout: int = TIMEOUT):
+        self._port: int = port
+        self._host: str = host
+        self._timeout: int = timeout
 
-def multiply_matrices(matrix_a: ndarray, matrix_b: ndarray) -> ndarray:
-    """
-    Multiply 2 matrices
+    def multiply_matrix(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> tuple[ndarray, int]:
+        """
+        Multiply 2 matrices
 
-    Args:
-        matrix_a (ndarray): Matrix A
-        matrix_b (ndarray): Matrix B
+        Args:
+            matrix_a (ndarray): Matrix A
+            matrix_b (ndarray): Matrix B
+            index (int): Matrix position
 
-    Returns:
-        ndarray: Multiple of Matrix A and Matrix B
-    """
-    return dot(matrix_a, matrix_b)
+        Returns:
+            tuple: Multiple of Matrix A and Matrix B, its position
+        """
+        return dot(matrix_a, matrix_b), index
 
-def handle_client(client_socket: socket) -> None:
-    """
-    Get partitions of Matrix A and Matrix B from client, multiply them, then send result back to client
+    def handle_client(self, client_socket: socket) -> None:
+        """
+        Get partitions of Matrix A and Matrix B from client, multiply them, then send result back to client
 
-    Args:
-        client_socket (socket): Client socket
-    """
-    results = { }
+        Args:
+            client_socket (socket): Client socket
+        """
+        try:
+            data = client_socket.recv(BUFFER)
+            matrix_a_partition, matrix_b_partition, index = loads(data)
+            print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition} at {client_socket.getsockname()}")
+            results = Server.multiply_matrix(self, matrix_a_partition, matrix_b_partition, index)
+            print(f"These are the results: {results}\n")
+            client_socket.sendall(dumps(results))
 
-    try:
-        data = client_socket.recv(BUFFER)
-        matrices = loads(data)
-        matrix_a_partitions, matrix_b_partitions = matrices["matrix_a"], matrices["matrix_b"]
-        for i in range(len(matrix_a_partitions)):
-            results[i] = multiply_matrices(matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS])
-        print(f"These are the results: {results}\n")
-        client_socket.send(dumps(results))
-        client_socket.close()
+        except error as msg:
+            print("ERROR: %s\n" % msg)
 
-    except error as msg:
-        client_socket.close()
-        print("ERROR: %s\n" % msg)
-        exit(0)
+        finally:
+            client_socket.close()
 
-def start_server() -> None:
-    """
-    Start server and listen for connections
-    """
-    server_socket = socket(AF_INET, SOCK_STREAM)
-    try:
-        server_socket.settimeout(TIMEOUT)
-        server_socket.bind((HOST, PORT))
-        server_socket.listen(TIMEOUT)
-        print(f"Server listening on Port {PORT}...")
+    def start_server(self) -> None:
+        """
+        Start server and listen for connections
+        """
+        server_socket = socket(AF_INET, SOCK_STREAM)
+        server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        
+        try:
+            server_socket.settimeout(TIMEOUT)
+            server_socket.bind((self._host, self._port))
+            server_socket.listen(1)
+            print(f"Server listening on Port {self._port}...")
 
-        while True:
-            client_socket, addr = server_socket.accept()
-            print(f"Accepted connection from {addr}\n")
-            handle_client(client_socket)
+            while True:
+                client_socket, addr = server_socket.accept()
+                print(f"Accepted connection from {addr}\n")
+                Server.handle_client(self, client_socket)
 
-    except error as msg:
-        server_socket.close()
-        print("ERROR: %s\n" % msg)
-        exit(0)
+        except error as msg:
+            print("ERROR: %s\n" % msg)
+
+        except KeyboardInterrupt:
+            print("ERROR: Keyboard Interrupted!\n")
+
+        finally:
+            server_socket.close()
 
 if __name__ == "__main__":
-    start_server()
+    server = Server(port = PORTS[0])
+    server.start_server()

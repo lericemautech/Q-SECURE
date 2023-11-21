@@ -157,7 +157,7 @@ class Client():
 
             # Catch exception
             except error as msg:
-                print("ERROR: %s" % msg)
+                print(f"ERROR: {msg}")
                 exit(1)
 
 def verify(result: ndarray, check: ndarray) -> bool:

@@ -49,7 +49,7 @@ class Server:
 
         # Catch exception
         except error as msg:
-            print("ERROR: %s" % msg)
+            print(f"ERROR: {msg}")
 
         # Close client socket once done
         finally:
@@ -84,7 +84,7 @@ class Server:
 
         # Catch exception
         except error as msg:
-            print("ERROR: %s\n" % msg)
+            print(f"ERROR: {msg}")
 
 if __name__ == "__main__":
     # Create server at 1st port in PORTS list

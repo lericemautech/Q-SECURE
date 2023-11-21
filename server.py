@@ -4,10 +4,12 @@ from numpy import dot, ndarray
 from Client import BUFFER, PORTS, HOST, TIMEOUT
 
 class Server:
-    def __init__(self, port: int, host: str = HOST, timeout: int = TIMEOUT):
+    def __init__(self, port: int, host: str = HOST):
+        # Server's port
         self._port: int = port
+
+        # Server's IP Address
         self._host: str = host
-        self._timeout: int = timeout
 
     def multiply_matrix(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> tuple[ndarray, int]:
         """
@@ -31,16 +33,25 @@ class Server:
             client_socket (socket): Client socket
         """
         try:
+            # Receive data from client
             data = client_socket.recv(BUFFER)
+
+            # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
             matrix_a_partition, matrix_b_partition, index = loads(data)
             print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition} at {client_socket.getsockname()}")
+
+            # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
             results = Server.multiply_matrix(self, matrix_a_partition, matrix_b_partition, index)
             print(f"These are the results: {results}\n")
+
+            # Send results back to client
             client_socket.sendall(dumps(results))
 
+        # Catch exception
         except error as msg:
-            print("ERROR: %s\n" % msg)
+            print("ERROR: %s" % msg)
 
+        # Close client socket once done
         finally:
             client_socket.close()
 
@@ -50,20 +61,34 @@ class Server:
         """        
         try:
             with socket(AF_INET, SOCK_STREAM) as server_socket:
+                # Allow reuse of address
                 server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+
+                # Set socket's timeout
                 server_socket.settimeout(TIMEOUT)
+
+                # Bind socket to address
                 server_socket.bind((self._host, self._port))
-                server_socket.listen(1)
+
+                # Listen for connection(s)
+                server_socket.listen()
                 print(f"Server listening on Port {self._port}...")
 
                 while True:
+                    # Accept connection from client
                     client_socket, addr = server_socket.accept()
                     print(f"Accepted connection from {addr}\n")
+
+                    # Handle client (i.e. get position and partitions of Matrix A and Matrix B, multiply them, then send result and its position back to client)
                     Server.handle_client(self, client_socket)
 
+        # Catch exception
         except error as msg:
             print("ERROR: %s\n" % msg)
 
 if __name__ == "__main__":
+    # Create server at 1st port in PORTS list
     server = Server(port = PORTS[0])
+
+    # Start server
     server.start_server()

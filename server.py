@@ -64,9 +64,6 @@ class Server:
         except error as msg:
             print("ERROR: %s\n" % msg)
 
-        except KeyboardInterrupt:
-            print("ERROR: Keyboard Interrupted!\n")
-
 if __name__ == "__main__":
     server = Server(port = PORTS[0])
     server.start_server()

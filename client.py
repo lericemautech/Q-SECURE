@@ -3,9 +3,6 @@ from pickle import loads, dumps
 from numpy import ndarray, random, array_split, array_equal, concatenate
 from queue import Queue
 
-# get small matrix client
-# call func to partition in main
-
 HOST = "127.0.0.1"
 PORTS = [12345, 12346]
 BUFFER = 2048
@@ -108,10 +105,10 @@ class Client():
         """
         Sends partitioned matrices to server(s)
         """
-        i = 0
-        
-        try:                
-            while not self._partitions.empty():
+        i = 0  
+        while not self._partitions.empty():
+            try:
+                
                 with socket(AF_INET, SOCK_STREAM) as sock:
                     sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
                     sock.connect((self._host, self._ports[i % len(self._ports)]))
@@ -121,29 +118,60 @@ class Client():
                     result, index = loads(sock.recv(BUFFER))
                     self._matrix_products[index] = result
                     i += 1
-            
-        except error as msg:
-            print("ERROR: %s\n" % msg)
-            exit(0)
+        
+            except error as msg:
+                print("ERROR: %s\n" % msg)
+                exit(0)
+
+def verify(result: ndarray, check: ndarray) -> bool:
+    """
+    Checks if result is correct
+
+    Args:
+        result (ndarray): Calculated result
+        check (ndarray): Numpy's result
+
+    Returns:
+        bool: True if correct, False otherwise
+    """
+    return array_equal(result, check)
+
+def generate_matrix(length: int, width: int) -> ndarray:
+    """
+    Generates a random matrix of size length * width
+
+    Args:
+        length (int): Length of matrix
+        width (int): Width of matrix
+
+    Returns:
+        ndarray: Random matrix of size length * width
+    """
+    return random.randint(MIN, MAX, size = (length, width))
+
+def print_outcome(result: ndarray, check: ndarray) -> None:
+    """
+    Prints calculation's outcome (i.e. correctness)
+
+    Args:
+        result (ndarray): Calculated result
+        check (ndarray): Numpy's result
+    """
+    if verify(result, check):
+        print("\nCORRECT CALCULATION!")
+        exit(1)
+
+    else:
+        print("\nINCORRECT CALCULATION...")
+        exit(0)
 
 if __name__ == "__main__":
     # Example matrices for testing
-    matrix_a = random.randint(MIN, MAX, size = (LENGTH, LENGTH))
-    matrix_b = random.randint(MIN, MAX, size = (LENGTH, MATRIX_2_WIDTH))
+    matrix_a = generate_matrix(LENGTH, LENGTH)
+    matrix_b = generate_matrix(LENGTH, MATRIX_2_WIDTH)
 
     client = Client(matrix_a, matrix_b)
 
     answer = client.get_result()
-
-    print("Matrix A:")
-    print(matrix_a)
-    print("\nMatrix B:")
-    print(matrix_b)
-    print("\nResult Matrix:")
-    print(answer)
-
-    print("\nCorrect answer:", matrix_a @ matrix_b)
-
-    if array_equal(matrix_a @ matrix_b, answer):
-        print("\nSuccess!")
-    else: print("\nFailure!")
+    correct_answer = matrix_a @ matrix_b    
+    print_outcome(answer, correct_answer)

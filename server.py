@@ -47,29 +47,25 @@ class Server:
     def start_server(self) -> None:
         """
         Start server and listen for connections
-        """
-        server_socket = socket(AF_INET, SOCK_STREAM)
-        server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        
+        """        
         try:
-            server_socket.settimeout(TIMEOUT)
-            server_socket.bind((self._host, self._port))
-            server_socket.listen(1)
-            print(f"Server listening on Port {self._port}...")
+            with socket(AF_INET, SOCK_STREAM) as server_socket:
+                server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+                server_socket.settimeout(TIMEOUT)
+                server_socket.bind((self._host, self._port))
+                server_socket.listen(1)
+                print(f"Server listening on Port {self._port}...")
 
-            while True:
-                client_socket, addr = server_socket.accept()
-                print(f"Accepted connection from {addr}\n")
-                Server.handle_client(self, client_socket)
+                while True:
+                    client_socket, addr = server_socket.accept()
+                    print(f"Accepted connection from {addr}\n")
+                    Server.handle_client(self, client_socket)
 
         except error as msg:
             print("ERROR: %s\n" % msg)
 
         except KeyboardInterrupt:
             print("ERROR: Keyboard Interrupted!\n")
-
-        finally:
-            server_socket.close()
 
 if __name__ == "__main__":
     server = Server(port = PORTS[0])

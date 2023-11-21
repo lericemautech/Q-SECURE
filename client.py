@@ -7,7 +7,6 @@ from queue import Queue
 # call func to partition in main
 
 HOST = "127.0.0.1"
-PORT = 12345
 PORTS = [12345, 12346]
 BUFFER = 2048
 LENGTH = 8
@@ -113,16 +112,15 @@ class Client():
         
         try:                
             while not self._partitions.empty():
-                sock = socket(AF_INET, SOCK_STREAM)
-                sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-                sock.connect((self._host, self._ports[i % len(self._ports)]))
-                to_send = self._partitions.get()
-                print(f"Sending {to_send} to {sock.getsockname()}")
-                sock.send(dumps(to_send))
-                result, index = loads(sock.recv(BUFFER))
-                self._matrix_products[index] = result
-                sock.close()
-                i += 1
+                with socket(AF_INET, SOCK_STREAM) as sock:
+                    sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+                    sock.connect((self._host, self._ports[i % len(self._ports)]))
+                    to_send = self._partitions.get()
+                    print(f"Sending {to_send} to {sock.getsockname()}")
+                    sock.sendall(dumps(to_send))
+                    result, index = loads(sock.recv(BUFFER))
+                    self._matrix_products[index] = result
+                    i += 1
             
         except error as msg:
             print("ERROR: %s\n" % msg)

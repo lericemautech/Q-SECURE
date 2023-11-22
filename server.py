@@ -1,7 +1,7 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
 from numpy import dot, ndarray
-from Client import BUFFER, PORTS, HOST, TIMEOUT
+from Client import BUFFER, PORTS, HOST, TIMEOUT, HEADERSIZE
 
 class Server:
     def __init__(self, port: int, host: str = HOST):
@@ -33,19 +33,45 @@ class Server:
             client_socket (socket): Client socket
         """
         try:
+            data = b""
+            new_data = True
+            msg_length = 0
             # Receive data from client
-            data = client_socket.recv(BUFFER)
+            while True:
+                packet = client_socket.recv(BUFFER)
+                if not packet:
+                    break
+                data += packet
+
+                # Check if the entire message has been received
+                if new_data:
+                    msg_length = int(data[:HEADERSIZE])
+                    new_data = False
+
+                if len(data) - HEADERSIZE >= msg_length:
+                    break
+
+            #data = client_socket.recv(BUFFER)
 
             # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
-            matrix_a_partition, matrix_b_partition, index = loads(data)
+            matrix_a_partition, matrix_b_partition, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length]) #loads(data)
             print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition} at {client_socket.getsockname()}")
+
+            # Send acknowledgment to the client
+            ack_msg = "ACK"
+            ack_msg = bytes(f"{len(ack_msg):<{HEADERSIZE}}", "utf-8") + ack_msg.encode("utf-8")
+            client_socket.sendall(ack_msg)
 
             # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
             results = Server.multiply_matrix(self, matrix_a_partition, matrix_b_partition, index)
             print(f"These are the results: {results}\n")
 
             # Send results back to client
-            client_socket.sendall(dumps(results))
+            result_data = dumps(results)
+            result_data = bytes(f"{len(result_data):<{HEADERSIZE}}", "utf-8") + result_data
+            client_socket.sendall(result_data)
+
+            #client_socket.sendall(dumps(results))
 
         # Catch exception
         except error as msg:

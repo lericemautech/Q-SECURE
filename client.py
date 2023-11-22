@@ -6,13 +6,14 @@ from queue import Queue
 HOST = "127.0.0.1"
 PORTS = [12345, 12346, 12347]
 BUFFER = 4096
-LENGTH = 64
-MATRIX_2_WIDTH = 1
-HORIZONTAL_PARTITIONS = 4
-VERTICAL_PARTITIONS = 4
+LENGTH = 128
+MATRIX_2_WIDTH = 2
+HORIZONTAL_PARTITIONS = 16
+VERTICAL_PARTITIONS = 16
 MIN = 0
 MAX = 5
 TIMEOUT = 10
+HEADERSIZE = 10
 
 # TODO Partition formula?
 
@@ -27,7 +28,7 @@ class Client():
         # Queue of partitions of Matrix A and Matrix B and their position, to be sent to server(s)
         self._partitions: Queue = Client.queue_partitions(self, matrix_a, matrix_b)
 
-        # Dictionary of results from server(s) (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
+        # Dictionary to store results from server(s) (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
         self._matrix_products: dict = { }
 
     def queue_partitions(self, matrix_a: ndarray, matrix_b: ndarray) -> Queue:
@@ -63,9 +64,6 @@ class Client():
         Returns:
             list: Partitioned Matrix #1
         """
-        # Check if matrix is 1D (i.e. vector)
-        if matrix.ndim == 1: return Client.partition_m2(self, matrix)
-        
         # Split matrix horizontally
         sub_matrices = array_split(matrix, HORIZONTAL_PARTITIONS, axis = 0)
         
@@ -139,14 +137,46 @@ class Client():
                     sock.connect(address)
 
                     # Get partitions to send to server
-                    to_send = self._partitions.get()
+                    to_send = dumps(self._partitions.get())
+
+                    # Add header to partitions
+                    to_send = bytes(f"{len(to_send):<{HEADERSIZE}}", "utf-8") + to_send
 
                     # Send partitions to server
                     #print(f"Sending {to_send} from {sock.getsockname()}\n")
-                    sock.send(dumps(to_send))
+                    sock.sendall(to_send)
+                    #sock.send(dumps(to_send))
+
+                    # Receive acknowledgment from the server
+                    ack_data = sock.recv(HEADERSIZE)
+                    ack_msg_length = int(ack_data.decode("utf-8").strip())
+
+                    # Ensure the acknowledgment is "ACK"
+                    ack_msg = sock.recv(ack_msg_length).decode("utf-8").strip()
+                    if ack_msg != "ACK":
+                        raise ValueError(f"Invalid acknowledgment: {ack_msg}")
+
+                    # Receive the result matrix
+                    data = b""
+                    new_data = True
+                    msg_length = 0
+                    
+                    while True:
+                        packet = sock.recv(BUFFER)
+                        if not packet:
+                            break
+                        data += packet
+
+                        # Check if the entire message has been received
+                        if new_data:
+                            msg_length = int(data[:HEADERSIZE])
+                            new_data = False
+
+                        if len(data) - HEADERSIZE >= msg_length:
+                            break
 
                     # Receive result (i.e. product of partitions and its position) from server
-                    result, index = loads(sock.recv(BUFFER))
+                    result, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length]) #loads(sock.recv(BUFFER))
                     #print(f"Received [{index}]: {result} from ({address})\n")
 
                     # Add result to dict, to be combined into final result later

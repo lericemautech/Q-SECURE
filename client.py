@@ -90,8 +90,8 @@ class Client():
         Returns:
             ndarray: Product of Matrix A and Matrix B 
         """
-        # Send partitioned matrices to server(s)
-        Client.send_matrices(self)
+        # Send partitioned matrices to 2 randomly selected server(s)
+        Client.send_matrices(self, 2)
 
         # Return [all] results combined into a single matrix
         return Client.combine_results(self)
@@ -117,7 +117,7 @@ class Client():
         # Combine all results into a single matrix
         return concatenate(combined_results)
 
-    def select_servers(self, num_servers: int) -> list[int]:
+    def randomly_select_servers(self, num_servers: int) -> list[int]:
         """
         Selects a random subset of server(s) to send jobs to
 
@@ -132,62 +132,64 @@ class Client():
 
         return sample(self._ports, num_servers)
     
-    def send_matrices(self) -> None:
+    def send_matrices(self, num_servers: int) -> None:
         """
         Send partitioned matrices to server(s)
+
+        Args:
+            num_servers (int): Amount of servers to send jobs tos
         """
         # Index used to determine which server to connect to (i.e. cycles through each server; round robin)
         i = 0
 
         # Select 2 random servers to send jobs to
-        server_addresses = Client.select_servers(self, 2)
+        server_addresses = Client.randomly_select_servers(self, num_servers)
 
         # While there's still partitions to send to server(s)
         while not self._partitions.empty():
             try:
-                with socket(AF_INET, SOCK_STREAM) as sock:
+                with socket(AF_INET, SOCK_STREAM) as client_socket:
                     # Allow reuse of address
-                    sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+                    client_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
                     # Address of server
-                    address = (self._host, server_addresses[i % len(server_addresses)])
+                    server_address = (self._host, server_addresses[i % len(server_addresses)])
 
                     # Connect to server
-                    sock.connect(address)
+                    client_socket.connect(server_address)
  
                     # Get partitions to send to server
                     partitions = self._partitions.get()
 
-                    #print("Sending partitions...", partitions)
-
                     # Convert partitions to bytes
                     to_send = dumps(partitions)
 
-                    # Add header to partitions
+                    # Add header to partitions packet
                     to_send = bytes(f"{len(to_send):<{HEADERSIZE}}", "utf-8") + to_send
 
                     # Send partitions to server
-                    sock.sendall(to_send)
+                    client_socket.sendall(to_send)
+                    #print("Sent:", partitions)
 
-                    # Receive acknowledgment from the server
-                    ack_data = sock.recv(HEADERSIZE)
+                    # Receive acknowledgment from server
+                    ack_data = client_socket.recv(HEADERSIZE)
+
+                    # Verify acknowledgment
                     ack_msg_length = int(ack_data.decode("utf-8").strip())
-
-                    # Verify the acknowledgment
-                    ack_msg = sock.recv(ack_msg_length).decode("utf-8").strip()
+                    ack_msg = client_socket.recv(ack_msg_length).decode("utf-8").strip()
                     if ack_msg != "ACK":
                         raise ValueError(f"Invalid acknowledgment: {ack_msg}")
                     
                     data, new_data, msg_length = b"", True, 0
                     
-                    # Receive the result matrix
+                    # Receive result from server
                     while True:
-                        packet = sock.recv(BUFFER)
+                        packet = client_socket.recv(BUFFER)
                         if not packet:
                             break
                         data += packet
 
-                        # Check if the entire message has been received
+                        # Check if entire message has been received
                         if new_data:
                             msg_length = int(data[:HEADERSIZE])
                             new_data = False
@@ -195,16 +197,20 @@ class Client():
                         if len(data) - HEADERSIZE >= msg_length:
                             break
 
-                    # Receive result (i.e. product of partitions and its position) from server
+                    # Unpack data (i.e. product of partitions and its position) from server
                     result, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length])
 
                     if result is not None:
-                        print(f"Result Matrix from Server at {address} = {result}\n")
-                    else:
-                        print(f"Failed to receive result from Server at {address}\n")
+                        print(f"Result Matrix from Server at {server_address} = {result}\n")
 
-                    # Add result to dict, to be combined into final result later
-                    self._matrix_products[index] = result
+                        # Add result to dict, to be combined into final result later
+                        self._matrix_products[index] = result
+
+                    else:
+                        print(f"Failed to receive result from Server at {server_address}; trying again later...\n")
+
+                        # Put partitions back into queue (since it was previously removed via .get()), to try again later
+                        self._partitions.put(partitions)
 
                     # Increment index
                     i += 1

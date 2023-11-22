@@ -21,7 +21,7 @@ class Server:
             index (int): Matrix position
 
         Returns:
-            tuple: Multiple of Matrix A and Matrix B, its position
+            tuple[ndarray, int]: Multiple of Matrix A and Matrix B, its position
         """
         return dot(matrix_a, matrix_b), index
 
@@ -42,7 +42,7 @@ class Server:
                     break
                 data += packet
 
-                # Check if the entire message has been received
+                # Check if entire message has been received
                 if new_data:
                     msg_length = int(data[:HEADERSIZE])
                     new_data = False
@@ -54,19 +54,23 @@ class Server:
             matrix_a_partition, matrix_b_partition, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length]) #loads(data)
             print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
 
-            # Send acknowledgment to the client
+            # Send acknowledgment to client
             ack_msg = "ACK"
             ack_msg = bytes(f"{len(ack_msg):<{HEADERSIZE}}", "utf-8") + ack_msg.encode("utf-8")
             client_socket.sendall(ack_msg)
 
             # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
-            results = Server.multiply_matrix(self, matrix_a_partition, matrix_b_partition, index)
-            print(f"\nSending: {results}\n")
+            result = Server.multiply_matrix(self, matrix_a_partition, matrix_b_partition, index)
+            
+            # Convert results to bytes
+            result_data = dumps(result)
+
+            # Add header to results packet
+            result_data = bytes(f"{len(result_data):<{HEADERSIZE}}", "utf-8") + result_data
 
             # Send results back to client
-            result_data = dumps(results)
-            result_data = bytes(f"{len(result_data):<{HEADERSIZE}}", "utf-8") + result_data
             client_socket.sendall(result_data)
+            print(f"\nSent: {result}\n")
 
         # Catch exception
         except error as msg:

@@ -6,7 +6,7 @@ from queue import Queue
 HOST = "127.0.0.1"
 PORTS = [12345, 12346, 12347]
 BUFFER = 4096
-LENGTH = 128
+LENGTH = 1024
 MATRIX_2_WIDTH = 2
 HORIZONTAL_PARTITIONS = 16
 VERTICAL_PARTITIONS = 16
@@ -143,7 +143,6 @@ class Client():
                     to_send = bytes(f"{len(to_send):<{HEADERSIZE}}", "utf-8") + to_send
 
                     # Send partitions to server
-                    #print(f"Sending {to_send} from {sock.getsockname()}\n")
                     sock.sendall(to_send)
 
                     # Receive acknowledgment from the server
@@ -174,7 +173,6 @@ class Client():
 
                     # Receive result (i.e. product of partitions and its position) from server
                     result, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length])
-                    #print(f"Received [{index}]: {result} from ({address})\n")
 
                     # Add result to dict, to be combined into final result later
                     self._matrix_products[index] = result
@@ -239,7 +237,7 @@ if __name__ == "__main__":
 
     # Get result
     answer = client.get_result()
-    #print(f"Calculated: {answer}\n")
+    print(f"Calculated: {answer}\n")
 
     # Get correct answer
     correct_answer = matrix_a @ matrix_b

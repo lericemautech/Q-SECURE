@@ -52,7 +52,7 @@ class Server:
 
             # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
             matrix_a_partition, matrix_b_partition, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length]) #loads(data)
-            print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition} at {client_socket.getsockname()}")
+            print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
 
             # Send acknowledgment to the client
             ack_msg = "ACK"
@@ -61,7 +61,7 @@ class Server:
 
             # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
             results = Server.multiply_matrix(self, matrix_a_partition, matrix_b_partition, index)
-            print(f"These are the results: {results}\n")
+            print(f"\nSending: {results}\n")
 
             # Send results back to client
             result_data = dumps(results)
@@ -88,17 +88,20 @@ class Server:
                 # Set socket's timeout
                 server_socket.settimeout(TIMEOUT)
 
-                # Bind socket to address
-                server_socket.bind((self._host, self._port))
+                # Server's address
+                server_address = (self._host, self._port)
+
+                # Bind socket to server's address
+                server_socket.bind(server_address)
 
                 # Listen for connection(s)
                 server_socket.listen()
-                print(f"Server listening on Port {self._port}...")
+                print(f"Server listening at {server_address}...")
 
                 while True:
                     # Accept connection from client
-                    client_socket, addr = server_socket.accept()
-                    print(f"Accepted connection from {addr}\n")
+                    client_socket, client_address = server_socket.accept()
+                    print(f"Accepted connection from {client_address}\n")
 
                     # Handle client (i.e. get position and partitions of Matrix A and Matrix B, multiply them, then send result and its position back to client)
                     Server.handle_client(self, client_socket)

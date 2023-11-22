@@ -135,7 +135,7 @@ class Client():
 
                     # Connect to server
                     sock.connect(address)
-
+ 
                     # Get partitions to send to server
                     partitions = self._partitions.get()
 
@@ -178,6 +178,11 @@ class Client():
 
                     # Receive result (i.e. product of partitions and its position) from server
                     result, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length])
+
+                    if result is not None:
+                        print(f"Result Matrix from Server at {address} = {result}\n")
+                    else:
+                        print(f"Failed to receive result from Server at {address}\n")
 
                     # Add result to dict, to be combined into final result later
                     self._matrix_products[index] = result
@@ -245,7 +250,7 @@ if __name__ == "__main__":
 
     # Get result
     answer = client.get_result()
-    #print(f"Calculated: {answer}\n")
+    print(f"Final Result Matrix = {answer}\n")
 
     # Get correct answer
     correct_answer = matrix_a @ matrix_b

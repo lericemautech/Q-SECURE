@@ -2,6 +2,7 @@ from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
 from numpy import ndarray, random, array_split, array_equal, concatenate
 from queue import Queue
+from random import sample
 
 HOST = "127.0.0.1"
 PORTS = [12345, 12346, 12347]
@@ -115,6 +116,21 @@ class Client():
 
         # Combine all results into a single matrix
         return concatenate(combined_results)
+
+    def select_servers(self, num_servers: int) -> list[int]:
+        """
+        Selects a random subset of server(s) to send jobs to
+
+        Args:
+            num_servers (int): Amount of servers to send jobs to
+
+        Returns:
+            list[int]: List of ports of random server(s) to send jobs to
+        """
+        if num_servers > len(self._ports):
+            raise ValueError(f"Number of servers ({num_servers}) exceeds number of ports ({len(self._ports)})")
+
+        return sample(self._ports, num_servers)
     
     def send_matrices(self) -> None:
         """
@@ -122,6 +138,9 @@ class Client():
         """
         # Index used to determine which server to connect to (i.e. cycles through each server; round robin)
         i = 0
+
+        # Select 2 random servers to send jobs to
+        server_addresses = Client.select_servers(self, 2)
 
         # While there's still partitions to send to server(s)
         while not self._partitions.empty():
@@ -131,7 +150,7 @@ class Client():
                     sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
                     # Address of server
-                    address = (self._host, self._ports[i % len(self._ports)])
+                    address = (self._host, server_addresses[i % len(server_addresses)])
 
                     # Connect to server
                     sock.connect(address)

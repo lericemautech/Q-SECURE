@@ -33,9 +33,8 @@ class Server:
             client_socket (socket): Client socket
         """
         try:
-            data = b""
-            new_data = True
-            msg_length = 0
+            data, new_data, msg_length = b"", True, 0
+            
             # Receive data from client
             while True:
                 packet = client_socket.recv(BUFFER)
@@ -50,8 +49,6 @@ class Server:
 
                 if len(data) - HEADERSIZE >= msg_length:
                     break
-
-            #data = client_socket.recv(BUFFER)
 
             # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
             matrix_a_partition, matrix_b_partition, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length]) #loads(data)
@@ -70,8 +67,6 @@ class Server:
             result_data = dumps(results)
             result_data = bytes(f"{len(result_data):<{HEADERSIZE}}", "utf-8") + result_data
             client_socket.sendall(result_data)
-
-            #client_socket.sendall(dumps(results))
 
         # Catch exception
         except error as msg:

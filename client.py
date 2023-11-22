@@ -145,22 +145,19 @@ class Client():
                     # Send partitions to server
                     #print(f"Sending {to_send} from {sock.getsockname()}\n")
                     sock.sendall(to_send)
-                    #sock.send(dumps(to_send))
 
                     # Receive acknowledgment from the server
                     ack_data = sock.recv(HEADERSIZE)
                     ack_msg_length = int(ack_data.decode("utf-8").strip())
 
-                    # Ensure the acknowledgment is "ACK"
+                    # Verify the acknowledgment
                     ack_msg = sock.recv(ack_msg_length).decode("utf-8").strip()
                     if ack_msg != "ACK":
                         raise ValueError(f"Invalid acknowledgment: {ack_msg}")
-
-                    # Receive the result matrix
-                    data = b""
-                    new_data = True
-                    msg_length = 0
                     
+                    data, new_data, msg_length = b"", True, 0
+                    
+                    # Receive the result matrix
                     while True:
                         packet = sock.recv(BUFFER)
                         if not packet:
@@ -176,7 +173,7 @@ class Client():
                             break
 
                     # Receive result (i.e. product of partitions and its position) from server
-                    result, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length]) #loads(sock.recv(BUFFER))
+                    result, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length])
                     #print(f"Received [{index}]: {result} from ({address})\n")
 
                     # Add result to dict, to be combined into final result later

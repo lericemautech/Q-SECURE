@@ -6,10 +6,10 @@ from queue import Queue
 HOST = "127.0.0.1"
 PORTS = [12345, 12346, 12347]
 BUFFER = 4096
-LENGTH = 1024
+LENGTH = 16
 MATRIX_2_WIDTH = 2
-HORIZONTAL_PARTITIONS = 16
-VERTICAL_PARTITIONS = 16
+HORIZONTAL_PARTITIONS = 2
+VERTICAL_PARTITIONS = 2
 MIN = 0
 MAX = 5
 TIMEOUT = 10
@@ -137,7 +137,12 @@ class Client():
                     sock.connect(address)
 
                     # Get partitions to send to server
-                    to_send = dumps(self._partitions.get())
+                    partitions = self._partitions.get()
+
+                    #print("Sending partitions...", partitions)
+
+                    # Convert partitions to bytes
+                    to_send = dumps(partitions)
 
                     # Add header to partitions
                     to_send = bytes(f"{len(to_send):<{HEADERSIZE}}", "utf-8") + to_send
@@ -232,12 +237,15 @@ if __name__ == "__main__":
     matrix_a = generate_matrix(LENGTH, LENGTH)
     matrix_b = generate_matrix(LENGTH, MATRIX_2_WIDTH)
 
+    #print(f"Matrix A: {matrix_a}\n")
+    #print(f"Matrix B: {matrix_b}\n")
+
     # Create Client to multiply matrices
     client = Client(matrix_a, matrix_b)
 
     # Get result
     answer = client.get_result()
-    print(f"Calculated: {answer}\n")
+    #print(f"Calculated: {answer}\n")
 
     # Get correct answer
     correct_answer = matrix_a @ matrix_b

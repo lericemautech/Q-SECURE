@@ -3,7 +3,7 @@ from pickle import loads, dumps
 from numpy import dot, ndarray
 from Client import BUFFER, PORTS, HOST, TIMEOUT, HEADERSIZE
 
-class Server:
+class Server():
     def __init__(self, port: int, host: str = HOST):
         # Server's port
         self._port: int = port

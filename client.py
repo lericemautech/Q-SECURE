@@ -125,7 +125,7 @@ class Client():
             num_servers (int): Amount of servers to send jobs to
 
         Returns:
-            list[int]: List of ports of random server(s) to send jobs to
+            list[int]: List of randomly selected server ports to send jobs to
         """
         if num_servers > len(self._ports):
             raise ValueError(f"Number of servers ({num_servers}) exceeds number of ports ({len(self._ports)})")
@@ -139,7 +139,7 @@ class Client():
         Args:
             num_servers (int): Amount of servers to send jobs tos
         """
-        # Index used to determine which server to connect to (i.e. cycles through each server; round robin)
+        # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0
 
         # Select 2 random servers to send jobs to
@@ -207,7 +207,7 @@ class Client():
                         self._matrix_products[index] = result
 
                     else:
-                        print(f"Failed to receive result from Server at {server_address}; trying again later...\n")
+                        print(f"Failed to receive result from Server at {server_address}; retrying later...\n")
 
                         # Put partitions back into queue (since it was previously removed via .get()), to try again later
                         self._partitions.put(partitions)

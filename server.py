@@ -1,7 +1,7 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
 from numpy import dot, ndarray
-from Client import BUFFER, PORTS, HOST, TIMEOUT, HEADERSIZE
+from Client import PORTS, HOST, TIMEOUT, receive_data, add_header
 
 class Server():
     def __init__(self, port: int, host: str = HOST):
@@ -32,41 +32,28 @@ class Server():
         Args:
             client_socket (socket): Client socket
         """
-        try:
-            data, new_data, msg_length = b"", True, 0
-            
+        try:            
             # Receive data from client
-            while True:
-                packet = client_socket.recv(BUFFER)
-                if not packet:
-                    break
-                data += packet
-
-                # Check if entire message has been received
-                if new_data:
-                    msg_length = int(data[:HEADERSIZE])
-                    new_data = False
-
-                if len(data) - HEADERSIZE >= msg_length:
-                    break
-
+            data = receive_data(client_socket)
+            
             # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
-            matrix_a_partition, matrix_b_partition, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length]) #loads(data)
+            matrix_a_partition, matrix_b_partition, index = loads(data)
             print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
 
+            # Add header to acknowledgment packet
+            ack_msg = add_header("ACK".encode("utf-8"))
+            
             # Send acknowledgment to client
-            ack_msg = "ACK"
-            ack_msg = bytes(f"{len(ack_msg):<{HEADERSIZE}}", "utf-8") + ack_msg.encode("utf-8")
             client_socket.sendall(ack_msg)
 
             # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
             result = Server.multiply_matrix(self, matrix_a_partition, matrix_b_partition, index)
             
-            # Convert results to bytes
+            # Convert result to bytes
             result_data = dumps(result)
 
             # Add header to results packet
-            result_data = bytes(f"{len(result_data):<{HEADERSIZE}}", "utf-8") + result_data
+            result_data = add_header(result_data)
 
             # Send results back to client
             client_socket.sendall(result_data)
@@ -107,12 +94,18 @@ class Server():
                     client_socket, client_address = server_socket.accept()
                     print(f"Accepted connection from {client_address}\n")
 
-                    # Handle client (i.e. get position and partitions of Matrix A and Matrix B, multiply them, then send result and its position back to client)
+                    # Handle client (i.e. get position and partitions of Matrix A and Matrix B,
+                    # multiply them, then send result and its position back to client)
                     Server.handle_client(self, client_socket)
 
         # Catch exception
         except error as msg:
             print(f"ERROR: {msg}")
+            exit(1)
+
+        # Exit gracefully
+        finally:
+            exit(0)
 
 if __name__ == "__main__":
     # Create server at 1st port in PORTS list

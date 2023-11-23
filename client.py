@@ -16,8 +16,6 @@ MAX = 5
 TIMEOUT = 10
 HEADERSIZE = 10
 
-# TODO Partition formula?
-
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, host: str = HOST, ports: list[int] = PORTS):
         # IP Address
@@ -91,7 +89,7 @@ class Client():
             ndarray: Product of Matrix A and Matrix B 
         """
         # Send partitioned matrices to 2 randomly selected server(s)
-        Client.send_matrices(self, 2)
+        Client.work(self, 2)
 
         # Return [all] results combined into a single matrix
         return Client.combine_results(self)
@@ -128,13 +126,14 @@ class Client():
             list[int]: List of randomly selected server ports to send jobs to
         """
         if num_servers > len(self._ports):
-            raise ValueError(f"Number of servers ({num_servers}) exceeds number of ports ({len(self._ports)})")
+            raise ValueError(f"ERROR: Number of servers ({num_servers}) exceeds number of ports ({len(self._ports)})")
 
         return sample(self._ports, num_servers)
     
-    def send_matrices(self, num_servers: int) -> None:
+    def work(self, num_servers: int) -> None:
         """
-        Send partitioned matrices to server(s)
+        Send partitioned matrices to server(s), get results,
+        then add them to dictionary for combining laters
 
         Args:
             num_servers (int): Amount of servers to send jobs tos
@@ -142,7 +141,7 @@ class Client():
         # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0
 
-        # Select 2 random servers to send jobs to
+        # Select random server(s) to send jobs to
         server_addresses = Client.randomly_select_servers(self, num_servers)
 
         # While there's still partitions to send to server(s)
@@ -165,7 +164,7 @@ class Client():
                     to_send = dumps(partitions)
 
                     # Add header to partitions packet
-                    to_send = bytes(f"{len(to_send):<{HEADERSIZE}}", "utf-8") + to_send
+                    to_send = add_header(to_send)
 
                     # Send partitions to server
                     client_socket.sendall(to_send)
@@ -179,26 +178,12 @@ class Client():
                     ack_msg = client_socket.recv(ack_msg_length).decode("utf-8").strip()
                     if ack_msg != "ACK":
                         raise ValueError(f"Invalid acknowledgment: {ack_msg}")
-                    
-                    data, new_data, msg_length = b"", True, 0
-                    
+                                        
                     # Receive result from server
-                    while True:
-                        packet = client_socket.recv(BUFFER)
-                        if not packet:
-                            break
-                        data += packet
-
-                        # Check if entire message has been received
-                        if new_data:
-                            msg_length = int(data[:HEADERSIZE])
-                            new_data = False
-
-                        if len(data) - HEADERSIZE >= msg_length:
-                            break
-
+                    data = receive_data(client_socket)
+                    
                     # Unpack data (i.e. product of partitions and its position) from server
-                    result, index = loads(data[HEADERSIZE:HEADERSIZE + msg_length])
+                    result, index = loads(data)
 
                     if result is not None:
                         print(f"Result Matrix from Server at {server_address} = {result}\n")
@@ -219,6 +204,47 @@ class Client():
             except error as msg:
                 print(f"ERROR: {msg}")
                 exit(1)
+
+def add_header(data: bytes) -> bytes:
+    """
+    Add header to data
+
+    Args:
+        data (bytes): Data to be sent
+
+    Returns:
+        bytes: Data with header
+    """
+    return bytes(f"{len(data):<{HEADERSIZE}}", "utf-8") + data
+
+def receive_data(sock: socket) -> bytes:
+    """
+    Receive data from socket
+
+    Args:
+        sock (socket): Connected socket
+
+    Returns:
+        bytes: Received data
+    """
+    data, new_data, msg_length = b"", True, 0
+    
+    # Receive result from socket
+    while True:
+        packet = sock.recv(BUFFER)
+        if not packet:
+            break
+        data += packet
+
+        # Check if entire message has been received
+        if new_data:
+            msg_length = int(data[:HEADERSIZE])
+            new_data = False
+
+        if len(data) - HEADERSIZE >= msg_length:
+            break
+
+    return data[HEADERSIZE:HEADERSIZE + msg_length]
 
 def verify(result: ndarray, check: ndarray) -> bool:
     """

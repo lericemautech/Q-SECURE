@@ -1,7 +1,7 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
 from numpy import dot, ndarray
-from Client import PORTS, HOST, TIMEOUT, receive_data, add_header
+from Shared import PORTS, HOST, TIMEOUT, receive_data, add_header
 
 class Server():
     def __init__(self, port: int, host: str = HOST):
@@ -11,7 +11,7 @@ class Server():
         # Server's IP Address
         self._host: str = host
 
-    def multiply_matrix(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> tuple[ndarray, int]:
+    def multiply_matrices(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> tuple[ndarray, int]:
         """
         Multiply 2 matrices
 
@@ -47,7 +47,7 @@ class Server():
             client_socket.sendall(ack_msg)
 
             # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
-            result = Server.multiply_matrix(self, matrix_a_partition, matrix_b_partition, index)
+            result = Server.multiply_matrices(self, matrix_a_partition, matrix_b_partition, index)
             
             # Convert result to bytes
             result_data = dumps(result)
@@ -77,7 +77,7 @@ class Server():
                 server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
                 # Set socket's timeout
-                server_socket.settimeout(TIMEOUT)
+                #server_socket.settimeout(TIMEOUT)
 
                 # Server's address
                 server_address = (self._host, self._port)

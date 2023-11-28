@@ -1,20 +1,9 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
-from numpy import ndarray, random, array_split, array_equal, concatenate
+from numpy import ndarray, random, array_split, array_equal
 from queue import Queue
 from random import sample
-
-HOST = "127.0.0.1"
-PORTS = [12345, 12346, 12347]
-BUFFER = 4096
-LENGTH = 16
-MATRIX_2_WIDTH = 2
-HORIZONTAL_PARTITIONS = 2
-VERTICAL_PARTITIONS = 2
-MIN = 0
-MAX = 5
-TIMEOUT = 10
-HEADERSIZE = 10
+from Shared import HOST, PORTS, HEADERSIZE, TIMEOUT, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive_data, add_header, generate_matrix, combine_results
 
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, host: str = HOST, ports: list[int] = PORTS):
@@ -88,34 +77,16 @@ class Client():
         Returns:
             ndarray: Product of Matrix A and Matrix B 
         """
+        select = random.randint(1, len(self._ports) + 1)
+        print("Generated Number =", select)
+        
         # Send partitioned matrices to 2 randomly selected server(s)
-        Client.work(self, 2)
+        Client.work(self, select)
 
         # Return [all] results combined into a single matrix
-        return Client.combine_results(self)
+        return combine_results(self._matrix_products)
 
-    def combine_results(self) -> ndarray:
-        """
-        Combines all separate submatrices into a single matrix
-
-        Returns:
-            ndarray: Combined result of given matrices
-        """
-        # Declare list for storing combined results, and end index
-        combined_results, end = [], 0
-
-        # Get all results from the queue, sorted by its position
-        results = [value for _, value in sorted(self._matrix_products.items())]
-
-        # Sum all values in the same row, then add to combined_results
-        for i in range(0, len(results), VERTICAL_PARTITIONS):
-            end += VERTICAL_PARTITIONS
-            combined_results.append(sum(results[i:end]))
-
-        # Combine all results into a single matrix
-        return concatenate(combined_results)
-
-    def randomly_select_servers(self, num_servers: int) -> list[int]:
+    def select_servers(self, num_servers: int) -> list[int]:
         """
         Selects a random subset of server(s) to send jobs to
 
@@ -142,7 +113,7 @@ class Client():
         i = 0
 
         # Select random server(s) to send jobs to
-        server_addresses = Client.randomly_select_servers(self, num_servers)
+        server_addresses = Client.select_servers(self, num_servers)
 
         # While there's still partitions to send to server(s)
         while not self._partitions.empty():
@@ -150,6 +121,9 @@ class Client():
                 with socket(AF_INET, SOCK_STREAM) as client_socket:
                     # Allow reuse of address
                     client_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+
+                    # Set socket's timeout
+                    #client_socket.settimeout(TIMEOUT)
 
                     # Address of server
                     server_address = (self._host, server_addresses[i % len(server_addresses)])
@@ -205,47 +179,6 @@ class Client():
                 print(f"ERROR: {msg}")
                 exit(1)
 
-def add_header(data: bytes) -> bytes:
-    """
-    Add header to data
-
-    Args:
-        data (bytes): Data to be sent
-
-    Returns:
-        bytes: Data with header
-    """
-    return bytes(f"{len(data):<{HEADERSIZE}}", "utf-8") + data
-
-def receive_data(sock: socket) -> bytes:
-    """
-    Receive data from socket
-
-    Args:
-        sock (socket): Connected socket
-
-    Returns:
-        bytes: Received data
-    """
-    data, new_data, msg_length = b"", True, 0
-    
-    # Receive result from socket
-    while True:
-        packet = sock.recv(BUFFER)
-        if not packet:
-            break
-        data += packet
-
-        # Check if entire message has been received
-        if new_data:
-            msg_length = int(data[:HEADERSIZE])
-            new_data = False
-
-        if len(data) - HEADERSIZE >= msg_length:
-            break
-
-    return data[HEADERSIZE:HEADERSIZE + msg_length]
-
 def verify(result: ndarray, check: ndarray) -> bool:
     """
     Checks if result is correct
@@ -258,19 +191,6 @@ def verify(result: ndarray, check: ndarray) -> bool:
         bool: True if correct, False otherwise
     """
     return array_equal(result, check)
-
-def generate_matrix(length: int, width: int) -> ndarray:
-    """
-    Generates a random matrix of size length * width
-
-    Args:
-        length (int): Length of matrix
-        width (int): Width of matrix
-
-    Returns:
-        ndarray: Random matrix of size length * width
-    """
-    return random.randint(MIN, MAX, size = (length, width))
 
 def print_outcome(result: ndarray, check: ndarray) -> None:
     """

@@ -1,5 +1,6 @@
 from numpy import ndarray
-from Manager import Manager, print_outcome, generate_matrix, LENGTH, MATRIX_2_WIDTH
+from Manager import Manager
+from Shared import print_outcome, generate_matrix, LENGTH, MATRIX_2_WIDTH
 
 def calculate_result(matrix_1: ndarray, matrix_2: ndarray) -> ndarray:
     """

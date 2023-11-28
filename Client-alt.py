@@ -2,12 +2,11 @@
 import socket
 import pickle
 import numpy as np
+from Shared import HEADERSIZE, BUFFER
 
 HOSTS = ["192.168.186.128", "192.168.186.130"]
 PORT = 9999
 LENGTH = 32
-BUFFER = 4096
-HEADERSIZE = 10
 
 def send_matrices(server_addresses, matrix_a, matrix_b):
     result_matrices = []

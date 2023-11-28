@@ -1,15 +1,10 @@
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import cpu_count
 from Worker import Worker, DONE
-from numpy import array_split, ndarray, concatenate, random, array_equal
+from numpy import array_split, ndarray, concatenate
+from Shared import LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, generate_matrix, combine_results, print_outcome
 
-LENGTH = 9
-MATRIX_2_WIDTH = 1
-MIN = 0
-MAX = 5
 N_WORKERS = 4
-HORIZONTAL_PARTITIONS = 3
-VERTICAL_PARTITIONS = 3
 
 # TODO Add input validation
 # TODO try-except statements
@@ -95,26 +90,6 @@ class Manager(ProcessPoolExecutor):
         for worker in self._workers:
             worker.join()
 
-    def combine_results(self) -> ndarray:
-        """
-        Combines all separate submatrices into a single matrix
-
-        Returns:
-            ndarray: Combined result of given matrices
-        """
-        combined_results, end = [], 0
-
-        # Get all results from the queue, sorted by its position
-        results = [value for _, value in sorted(self._results.items())]
-
-        # Sum all values in the same row, then add to combined_results
-        for i in range(0, len(results), VERTICAL_PARTITIONS):
-            end += VERTICAL_PARTITIONS
-            combined_results.append(sum(results[i:end]))
-
-        # Combine all results into a single matrix
-        return concatenate(combined_results)
-
     def get_result(self) -> ndarray:
         """
         Get final result
@@ -128,49 +103,7 @@ class Manager(ProcessPoolExecutor):
             result, index = self._workers[i % self._process_count].out_queue.get()
             self._results[index] = result
 
-        return Manager.combine_results(self)
-
-def verify(result: ndarray, check: ndarray) -> bool:
-    """
-    Checks if result is correct
-
-    Args:
-        result (ndarray): Calculated result
-        check (ndarray): Numpy's result
-
-    Returns:
-        bool: True if correct, False otherwise
-    """
-    return array_equal(result, check)
-
-def generate_matrix(length: int, width: int) -> ndarray:
-    """
-    Generates a random matrix of size length * width
-
-    Args:
-        length (int): Length of matrix
-        width (int): Width of matrix
-
-    Returns:
-        ndarray: Random matrix of size length * width
-    """
-    return random.randint(MIN, MAX, size = (length, width))
-
-def print_outcome(result: ndarray, check: ndarray) -> None:
-    """
-    Prints calculation's outcome (i.e. correctness)
-
-    Args:
-        result (ndarray): Calculated result
-        check (ndarray): Numpy's result
-    """
-    if verify(result, check):
-        print("\nCORRECT CALCULATION!")
-        exit(1)
-
-    else:
-        print("\nINCORRECT CALCULATION...")
-        exit(0)
+        return combine_results(self._results)
 
 if __name__ == "__main__":
     # Matrix #1

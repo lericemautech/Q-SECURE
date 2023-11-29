@@ -1,19 +1,12 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
 from numpy import dot, ndarray
-from platform import platform, processor
 from Shared import receive_data, send_data
 
 class Server():
     def __init__(self, address: tuple[str, int]):
         # Server's IP Address and port
         self._address = address
-
-        # Information about server (i.e. CPU model and OS)
-        self._information: dict = { "PORT" : self._address[1], "CPU" : processor(), "OS" : platform() }
-
-        # Server's network card
-        #self._network_card: list[tuple[int, str]] = if_nameindex()        
 
     def multiply_matrices(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> tuple[ndarray, int]:
         """
@@ -54,24 +47,16 @@ class Server():
             # Receive data from client
             data = receive_data(client_socket)
 
-            if loads(data) == "INFO":
-                print("Received request from client for server information")
-                
-                # Convert server information to bytes, then send to client
-                Server.send(self, client_socket, dumps(self._information))
-                print(f"\nSent: {self._information}\n")
+            # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
+            matrix_a_partition, matrix_b_partition, index = loads(data)
+            print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
 
-            elif isinstance(loads(data), tuple):
-                # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
-                matrix_a_partition, matrix_b_partition, index = loads(data)
-                print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
-
-                # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
-                result = Server.multiply_matrices(self, matrix_a_partition, matrix_b_partition, index)
-            
-                # Convert result to bytes, then send back to client
-                Server.send(self, client_socket, dumps(result))
-                print(f"\nSent: {result}\n")
+            # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
+            result = Server.multiply_matrices(self, matrix_a_partition, matrix_b_partition, index)
+        
+            # Convert result to bytes, then send back to client
+            Server.send(self, client_socket, dumps(result))
+            print(f"\nSent: {result}\n")
 
         # Catch exception
         except error as msg:
@@ -117,13 +102,3 @@ class Server():
         # Exit gracefully
         finally:
             exit(0)
-
-    @property
-    def information(self) -> dict:
-        """
-        Get server information (i.e. port, CPU model and OS)
-
-        Returns:
-            dict[int, str, str]: Server's port, CPU model, and OS
-        """
-        return self._information

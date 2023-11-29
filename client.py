@@ -13,9 +13,6 @@ class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[tuple[str, int]] = ADDRESSES):
         # IP Address(es) and ports of server(s)
         self._addresses: list[tuple[str, int]] = addresses
-
-        # List of server(s) information (i.e. port, CPU model, and OS)
-        self._servers_info: list[dict] = Client.get_server_info(self)
         
         # Queue of partitions of Matrix A and Matrix B and their position, to be sent to server(s)
         self._partitions: Queue = Client.queue_partitions(self, matrix_a, matrix_b)
@@ -83,9 +80,6 @@ class Client():
         """
         select = random.randint(1, len(self._addresses) + 1)
         print("Generated Number =", select)
-
-        print("Getting Server Information...")
-        print(self._servers_info, "\n")
         
         # Send partitioned matrices to 2 randomly selected server(s)
         Client.work(self, select)
@@ -143,40 +137,6 @@ class Client():
         except error as msg:
             print(f"ERROR: {msg}")
             exit(1)
-
-    def get_server_info(self) -> list[dict]:
-        """
-        Get server information (i.e. port, CPU model and OS)
-        """
-        servers_info = [ ]
-        for address in self._addresses:
-            try:
-                with socket(AF_INET, SOCK_STREAM) as client_socket:
-                    # Allow reuse of address
-                    client_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-
-                    # Connect to server
-                    client_socket.connect(address)
-                                         
-                    # Receive result from server
-                    data = Client.handle_server(self, client_socket, dumps("INFO"))
-                    
-                    # Unpack data from server
-                    result = loads(data)
-
-                    if result is not None:
-                        print(f"Information from Server at {address} = {result}\n")
-                        servers_info.append(result)
-
-                    else:
-                        print(f"Failed to receive information from Server at {address}; retrying later...\n")
-
-            # Catch exception
-            except error as msg:
-                print(f"ERROR: {msg}")
-                exit(1)
-
-        return servers_info
 
     def work(self, num_servers: int) -> None:
         """

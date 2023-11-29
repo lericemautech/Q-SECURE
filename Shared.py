@@ -1,8 +1,6 @@
 from socket import socket
 from numpy import ndarray, random, array_equal, concatenate
 
-HOST = "127.0.0.1"
-PORTS = [12345, 12346, 12347]
 TIMEOUT = 10
 BUFFER = 4096
 HEADERSIZE = 10
@@ -24,6 +22,20 @@ def add_header(data: bytes) -> bytes:
         bytes: Data with header
     """
     return bytes(f"{len(data):<{HEADERSIZE}}", "utf-8") + data
+
+def send_data(sock: socket, data: bytes) -> None:
+    """
+    Send data to socket
+
+    Args:
+        sock (socket): Connected socket
+        data (bytes): Data to be sent
+    """
+    # Add header to data packet
+    data_with_header = add_header(data)
+
+    # Send message back
+    sock.sendall(data_with_header)
 
 def receive_data(sock: socket) -> bytes:
     """

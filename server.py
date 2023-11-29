@@ -1,15 +1,19 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
 from numpy import dot, ndarray
-from Shared import PORTS, HOST, TIMEOUT, receive_data, add_header
+from platform import platform, processor
+from Shared import receive_data, send_data
 
 class Server():
-    def __init__(self, port: int, host: str = HOST):
-        # Server's port
-        self._port: int = port
+    def __init__(self, address: tuple[str, int]):
+        # Server's IP Address and port
+        self._address = address
 
-        # Server's IP Address
-        self._host: str = host
+        # Information about server (i.e. CPU model and OS)
+        self._information: dict = { "PORT" : self._address[1], "CPU" : processor(), "OS" : platform() }
+
+        # Server's network card
+        #self._network_card: list[tuple[int, str]] = if_nameindex()        
 
     def multiply_matrices(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> tuple[ndarray, int]:
         """
@@ -25,6 +29,20 @@ class Server():
         """
         return dot(matrix_a, matrix_b), index
 
+    def send(self, client_socket: socket, data: bytes) -> None:
+        """
+        Send data to client
+
+        Args:
+            client_socket (socket): Client socket
+            data (bytes): _description_
+        """
+        # Add header to and send acknowledgment packet
+        send_data(client_socket, "ACK".encode("utf-8"))
+        
+        # Add header to and send message packet back to client
+        send_data(client_socket, data)
+
     def handle_client(self, client_socket: socket) -> None:
         """
         Get partitions of Matrix A and Matrix B from client, multiply them, then send result back to client
@@ -35,29 +53,25 @@ class Server():
         try:            
             # Receive data from client
             data = receive_data(client_socket)
+
+            if loads(data) == "INFO":
+                print("Received request from client for server information")
+                
+                # Convert server information to bytes, then send to client
+                Server.send(self, client_socket, dumps(self._information))
+                print(f"\nSent: {self._information}\n")
+
+            elif isinstance(loads(data), tuple):
+                # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
+                matrix_a_partition, matrix_b_partition, index = loads(data)
+                print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
+
+                # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
+                result = Server.multiply_matrices(self, matrix_a_partition, matrix_b_partition, index)
             
-            # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
-            matrix_a_partition, matrix_b_partition, index = loads(data)
-            print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
-
-            # Add header to acknowledgment packet
-            ack_msg = add_header("ACK".encode("utf-8"))
-            
-            # Send acknowledgment to client
-            client_socket.sendall(ack_msg)
-
-            # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
-            result = Server.multiply_matrices(self, matrix_a_partition, matrix_b_partition, index)
-            
-            # Convert result to bytes
-            result_data = dumps(result)
-
-            # Add header to results packet
-            result_data = add_header(result_data)
-
-            # Send results back to client
-            client_socket.sendall(result_data)
-            print(f"\nSent: {result}\n")
+                # Convert result to bytes, then send back to client
+                Server.send(self, client_socket, dumps(result))
+                print(f"\nSent: {result}\n")
 
         # Catch exception
         except error as msg:
@@ -79,15 +93,12 @@ class Server():
                 # Set socket's timeout
                 #server_socket.settimeout(TIMEOUT)
 
-                # Server's address
-                server_address = (self._host, self._port)
-
                 # Bind socket to server's address
-                server_socket.bind(server_address)
+                server_socket.bind(self._address)
 
                 # Listen for connection(s)
                 server_socket.listen()
-                print(f"Server listening at {server_address}...")
+                print(f"Server listening at {self._address}...")
 
                 while True:
                     # Accept connection from client
@@ -107,9 +118,12 @@ class Server():
         finally:
             exit(0)
 
-if __name__ == "__main__":
-    # Create server at 1st port in PORTS list
-    server = Server(port = PORTS[0])
+    @property
+    def information(self) -> dict:
+        """
+        Get server information (i.e. port, CPU model and OS)
 
-    # Start server
-    server.start_server()
+        Returns:
+            dict[int, str, str]: Server's port, CPU model, and OS
+        """
+        return self._information

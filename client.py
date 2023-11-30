@@ -87,7 +87,6 @@ class Client():
         # Return [all] results combined into a single matrix
         return combine_results(self._matrix_products)
 
-    # TODO rewrite to use self._servers_info instead of self._ports
     def select_servers(self, num_servers: int) -> list[tuple[str, int]]:
         """
         Selects a random subset of server(s) to send jobs to

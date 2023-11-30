@@ -75,9 +75,6 @@ class Server():
                 # Allow reuse of address
                 server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
-                # Set socket's timeout
-                #server_socket.settimeout(TIMEOUT)
-
                 # Bind socket to server's address
                 server_socket.bind(self._address)
 

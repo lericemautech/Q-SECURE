@@ -105,17 +105,17 @@ class Client():
 
     def handle_server(self, client_socket: socket, data: bytes) -> bytes:
         """
-        _summary_
+        Exchange data with server
 
         Args:
-            client_socket (socket): _description_
-            data (bytes): _description_
+            client_socket (socket): Client socket
+            data (bytes): Data to be sent
 
         Raises:
-            ValueError: _description_
+            ValueError: Invalid acknowledgment (i.e. "ACK" not received from server)
 
         Returns:
-            bytes: _description_
+            bytes: Data received from server
         """
         try:
             # Add header to and send data packet to server
@@ -149,7 +149,7 @@ class Client():
         # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0
 
-        # Select random server(s) to send jobs to
+        # Select random subset of server(s) to send jobs to
         server_addresses = Client.select_servers(self, num_servers)
 
         # While there's still partitions to send to server(s)
@@ -158,9 +158,6 @@ class Client():
                 with socket(AF_INET, SOCK_STREAM) as client_socket:
                     # Allow reuse of address
                     client_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-
-                    # Set socket's timeout
-                    #client_socket.settimeout(TIMEOUT)
 
                     # Address of server
                     server_address = server_addresses[i % len(server_addresses)]

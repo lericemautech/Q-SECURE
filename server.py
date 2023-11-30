@@ -6,7 +6,7 @@ from Shared import receive_data, send_data
 class Server():
     def __init__(self, address: tuple[str, int]):
         # Server's IP Address and port
-        self._address = address
+        self._server_address = address
 
     def multiply_matrices(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> tuple[ndarray, int]:
         """
@@ -76,11 +76,11 @@ class Server():
                 server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
                 # Bind socket to server's address
-                server_socket.bind(self._address)
+                server_socket.bind(self._server_address)
 
                 # Listen for connection(s)
                 server_socket.listen()
-                print(f"Server listening at {self._address}...")
+                print(f"Server listening at {self._server_address}...")
 
                 while True:
                     # Accept connection from client

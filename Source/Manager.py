@@ -1,8 +1,8 @@
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import cpu_count
 from Worker import Worker, DONE
-from numpy import array_split, ndarray, concatenate
-from Shared import LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, generate_matrix, combine_results, print_outcome
+from numpy import array_split, concatenate, ndarray
+from Shared import LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, generate_matrix, print_outcome
 
 N_WORKERS = 4
 
@@ -74,6 +74,30 @@ class Manager(ProcessPoolExecutor):
         """
         return array_split(matrix, VERTICAL_PARTITIONS, axis = 0)
 
+    def combine_results(self, matrix_products: dict[int, ndarray]) -> ndarray:
+        """
+        Combines all separate submatrices into a single matrix
+
+        Args:
+            matrix_products (dict[int, ndarray]): Dictionary to store results (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
+
+        Returns:
+            ndarray: Combined result of given matrices
+        """
+        # Declare list for storing combined results, and end index
+        combined_results, end = [], 0
+
+        # Get all results from the queue, sorted by its position
+        results = [value for _, value in sorted(matrix_products.items())]
+
+        # Sum all values in the same row, then add to combined_results
+        for i in range(0, len(results), VERTICAL_PARTITIONS):
+            end += VERTICAL_PARTITIONS
+            combined_results.append(sum(results[i:end]))
+
+        # Combine all results into a single matrix
+        return concatenate(combined_results)
+
     def allocate_work(self) -> None:
         """
         Allocated work for each process
@@ -103,7 +127,7 @@ class Manager(ProcessPoolExecutor):
             result, index = self._workers[i % self._process_count].out_queue.get()
             self._results[index] = result
 
-        return combine_results(self._results)
+        return self.combine_results(self._results)
 
 if __name__ == "__main__":
     # Matrix #1

@@ -1,4 +1,5 @@
 from socket import socket
+from typing import NamedTuple
 from numpy import ndarray, random, array_equal, concatenate
 
 TIMEOUT = 10
@@ -10,6 +11,14 @@ LENGTH = 16
 MATRIX_2_WIDTH = 2
 HORIZONTAL_PARTITIONS = 2
 VERTICAL_PARTITIONS = 2
+
+class Matrix(NamedTuple):
+    matrix: ndarray
+    index: int
+
+class Address(NamedTuple):
+    ip: str
+    port: int
 
 def add_header(data: bytes) -> bytes:
     """

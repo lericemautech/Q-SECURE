@@ -3,16 +3,16 @@ from pickle import loads, dumps
 from numpy import ndarray, random, array_split, array_equal
 from queue import Queue
 from random import sample
-from Shared import HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive_data, send_data, generate_matrix, combine_results
+from Shared import Address, HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive_data, send_data, generate_matrix, combine_results
 
-ADDRESSES = [ ("127.0.0.1", 12345), ("127.0.0.1", 12346), ("127.0.0.1", 12347) ]
-#ADDRESSES = [ ("192.168.207.129", 12345), ("192.168.207.130", 12346), ("192.168.207.131", 12347) ]
+ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
+#ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
 # VM1/Client, VM2/Server, VM3/Server
 
 class Client():
-    def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[tuple[str, int]] = ADDRESSES):
+    def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[Address] = ADDRESSES):
         # IP Address(es) and ports of server(s)
-        self._addresses: list[tuple[str, int]] = addresses
+        self._addresses: list[Address] = addresses
         
         # Queue of partitions of Matrix A and Matrix B and their position, to be sent to server(s)
         self._partitions: Queue = Client.queue_partitions(self, matrix_a, matrix_b)
@@ -87,20 +87,7 @@ class Client():
         # Return [all] results combined into a single matrix
         return combine_results(self._matrix_products)
 
-    def select_servers(self, num_servers: int) -> list[tuple[str, int]]:
-        """
-        Selects a random subset of server(s) to send jobs to
-
-        Args:
-            num_servers (int): Amount of servers to send jobs to
-
-        Returns:
-            list[tuple[str, int]]: List of randomly selected server addresses to send jobs to
-        """
-        if num_servers > len(self._addresses):
-            raise ValueError(f"ERROR: Number of servers ({num_servers}) exceeds number of addresses ({len(self._addresses)})")
-
-        return sample(self._addresses, num_servers)
+    
 
     def handle_server(self, client_socket: socket, data: bytes) -> bytes:
         """
@@ -148,8 +135,23 @@ class Client():
         # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0
 
+        def select_servers(self, num_servers: int) -> list[Address]:
+            """
+            Selects a random subset of server(s) to send jobs to
+
+            Args:
+                num_servers (int): Amount of servers to send jobs to
+
+            Returns:
+                list[Address]: List of randomly selected server addresses to send jobs to
+            """
+            if num_servers > len(self._addresses):
+                raise ValueError(f"ERROR: Number of servers ({num_servers}) exceeds number of addresses ({len(self._addresses)})")
+
+            return sample(self._addresses, num_servers)
+
         # Select random subset of server(s) to send jobs to
-        server_addresses = Client.select_servers(self, num_servers)
+        server_addresses = select_servers(self, num_servers)
 
         # While there's still partitions to send to server(s)
         while not self._partitions.empty():

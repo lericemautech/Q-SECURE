@@ -1,14 +1,14 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
-from numpy import dot, ndarray
-from Shared import receive_data, send_data
+from numpy import ndarray, dot
+from Shared import Matrix, Address, receive_data, send_data
 
 class Server():
-    def __init__(self, address: tuple[str, int]):
+    def __init__(self, address: Address):
         # Server's IP Address and port
         self._server_address = address
 
-    def multiply_matrices(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> tuple[ndarray, int]:
+    def multiply_matrices(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> Matrix:
         """
         Multiply 2 matrices
 
@@ -18,9 +18,9 @@ class Server():
             index (int): Matrix position
 
         Returns:
-            tuple[ndarray, int]: Multiple of Matrix A and Matrix B, its position
+            Matrix: Multiple of Matrix A and Matrix B, its position
         """
-        return dot(matrix_a, matrix_b), index
+        return Matrix(dot(matrix_a, matrix_b), index)
 
     def send(self, client_socket: socket, data: bytes) -> None:
         """

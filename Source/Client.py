@@ -1,12 +1,12 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
-from numpy import ndarray, random, array_split, array_equal
+from numpy import ndarray, random, array_split, array_equal, concatenate
 from queue import Queue
 from random import sample
-from Shared import Address, HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive_data, send_data, generate_matrix, combine_results
+from Shared import Address, HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive, send, generate_matrix
 
-ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
-#ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
+#ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
+ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
 # VM1/Client, VM2/Server, VM3/Server
 
 class Client():
@@ -15,12 +15,29 @@ class Client():
         self._addresses: list[Address] = addresses
         
         # Queue of partitions of Matrix A and Matrix B and their position, to be sent to server(s)
-        self._partitions: Queue = Client.queue_partitions(self, matrix_a, matrix_b)
+        self._partitions: Queue = self._queue_partitions(matrix_a, matrix_b)
 
         # Dictionary to store results from server(s) (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
-        self._matrix_products: dict = { }
+        self._matrix_products: dict[int, ndarray] = { }
+
+    def _partition(self, matrix_a: ndarray, matrix_b: ndarray) -> tuple[list[ndarray], list[ndarray]]:
+        """
+        Partition Matrix A and Matrix B into submatrices
+
+        Args:
+            matrix_a (ndarray): Matrix A to be partitioned
+            matrix_b (ndarray): Matrix B to be partitioned
+
+        Returns:
+            tuple[list[ndarray], list[ndarray]]: Partitioned Matrix A and Matrix B
+        """
+        # Split matrix horizontally
+        sub_matrices = array_split(matrix_a, HORIZONTAL_PARTITIONS, axis = 0)
         
-    def queue_partitions(self, matrix_a: ndarray, matrix_b: ndarray) -> Queue:
+        # Split submatrices vertically, then return
+        return [m for sub_matrix in sub_matrices for m in  array_split(sub_matrix, VERTICAL_PARTITIONS, axis = 1)], array_split(matrix_b, VERTICAL_PARTITIONS, axis = 0)
+
+    def _queue_partitions(self, matrix_a: ndarray, matrix_b: ndarray) -> Queue:
         """
         Add partitions of Matrix A and Matrix B and their position to queue
 
@@ -35,7 +52,7 @@ class Client():
         queue = Queue()
 
         # Get partitions of Matrix A and Matrix B
-        matrix_a_partitions, matrix_b_partitions = Client.partition_m1(self, matrix_a), Client.partition_m2(self, matrix_b)
+        matrix_a_partitions, matrix_b_partitions = self._partition(matrix_a, matrix_b)
 
         # Add partitions of Matrix A and Matrix B and their position to queue
         for i in range(len(matrix_a_partitions)):
@@ -43,33 +60,29 @@ class Client():
 
         return queue
 
-    def partition_m1(self, matrix: ndarray) -> list:
+    def _combine_results(self, matrix_products: dict[int, ndarray]) -> ndarray:
         """
-        Partition Matrix A into submatrices
+        Combines all separate submatrices into a single matrix
 
         Args:
-            matrix (ndarray): Matrix A to be partitioned
+            matrix_products (dict[int, ndarray]): Dictionary to store results (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
 
         Returns:
-            list: Partitioned Matrix A
+            ndarray: Combined result of given matrices
         """
-        # Split matrix horizontally
-        sub_matrices = array_split(matrix, HORIZONTAL_PARTITIONS, axis = 0)
-        
-        # Split submatrices vertically, then return
-        return [m for sub_matrix in sub_matrices for m in  array_split(sub_matrix, VERTICAL_PARTITIONS, axis = 1)]
+        # Declare list for storing combined results, and end index
+        combined_results, end = [], 0
 
-    def partition_m2(self, matrix: ndarray) -> list:
-        """
-        Partition Matrix B into submatrices
+        # Get all results from the queue, sorted by its position
+        results = [value for _, value in sorted(matrix_products.items())]
 
-        Args:
-            matrix (ndarray): Matrix B to be partitioned
+        # Sum all values in the same row, then add to combined_results
+        for i in range(0, len(results), VERTICAL_PARTITIONS):
+            end += VERTICAL_PARTITIONS
+            combined_results.append(sum(results[i:end]))
 
-        Returns:
-            list: Partitioned Matrix B
-        """
-        return array_split(matrix, VERTICAL_PARTITIONS, axis = 0)
+        # Combine all results into a single matrix
+        return concatenate(combined_results)
 
     def get_result(self) -> ndarray:
         """
@@ -82,14 +95,12 @@ class Client():
         print("Generated Number =", select)
         
         # Send partitioned matrices to 2 randomly selected server(s)
-        Client.work(self, select)
+        self._work(select)
 
         # Return [all] results combined into a single matrix
-        return combine_results(self._matrix_products)
+        return self._combine_results(self._matrix_products)
 
-    
-
-    def handle_server(self, client_socket: socket, data: bytes) -> bytes:
+    def _handle_server(self, client_socket: socket, data: bytes) -> bytes:
         """
         Exchange data with server
 
@@ -105,7 +116,7 @@ class Client():
         """
         try:
             # Add header to and send data packet to server
-            send_data(client_socket, data)
+            send(client_socket, data)
 
             # Receive acknowledgment from server
             ack_data = client_socket.recv(HEADERSIZE)
@@ -117,14 +128,37 @@ class Client():
                 raise ValueError(f"Invalid acknowledgment: {ack_msg}")
                                 
             # Receive data from server
-            return receive_data(client_socket)
+            return receive(client_socket)
+
+        # Catch exceptions
+        except ConnectionRefusedError:
+            print("ERROR: (Client._handle_server) Connection to server refused")
+            exit(1)
+            
+        except ConnectionError:
+            print("ERROR: (Client._handle_server) Connection to server lost")
+            exit(1)
                 
-        # Catch exception
         except error as msg:
-            print(f"ERROR: {msg}")
+            print(f"ERROR: (Client._handle_server) {msg}")
             exit(1)
 
-    def work(self, num_servers: int) -> None:
+    def _select_servers(self, num_servers: int) -> list[Address]:
+        """
+        Selects a random subset of server(s) to send jobs to
+
+        Args:
+            num_servers (int): Amount of servers to send jobs to
+
+        Returns:
+            list[Address]: List of randomly selected server addresses to send jobs to
+        """
+        if num_servers > len(self._addresses):
+            raise ValueError(f"ERROR: Number of servers ({num_servers}) exceeds number of addresses ({len(self._addresses)})")
+
+        return sample(self._addresses, num_servers)
+
+    def _work(self, num_servers: int) -> None:
         """
         Send partitioned matrices to server(s), get results,
         then add them to dictionary for combining laters
@@ -135,23 +169,8 @@ class Client():
         # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0
 
-        def select_servers(self, num_servers: int) -> list[Address]:
-            """
-            Selects a random subset of server(s) to send jobs to
-
-            Args:
-                num_servers (int): Amount of servers to send jobs to
-
-            Returns:
-                list[Address]: List of randomly selected server addresses to send jobs to
-            """
-            if num_servers > len(self._addresses):
-                raise ValueError(f"ERROR: Number of servers ({num_servers}) exceeds number of addresses ({len(self._addresses)})")
-
-            return sample(self._addresses, num_servers)
-
         # Select random subset of server(s) to send jobs to
-        server_addresses = select_servers(self, num_servers)
+        server_addresses = self._select_servers(num_servers)
 
         # While there's still partitions to send to server(s)
         while not self._partitions.empty():
@@ -170,11 +189,12 @@ class Client():
                     partitions = self._partitions.get()
 
                     # Receive result from server
-                    data = Client.handle_server(self, client_socket, dumps(partitions))
+                    data = self._handle_server(client_socket, dumps(partitions))
                     
                     # Unpack data (i.e. product of partitions and its position) from server
                     result, index = loads(data)
 
+                    # Check if result and index was received (i.e. not None)
                     if result is not None:
                         print(f"Result Matrix from Server at {server_address} = {result}\n")
 
@@ -190,23 +210,18 @@ class Client():
                     # Increment index
                     i += 1
 
-            # Catch exception
-            except error as msg:
-                print(f"ERROR: {msg}")
+            # Catch exceptions
+            except ConnectionRefusedError:
+                print("ERROR: (Client._work) Connection to server refused")
                 exit(1)
 
-def verify(result: ndarray, check: ndarray) -> bool:
-    """
-    Checks if result is correct
-
-    Args:
-        result (ndarray): Calculated result
-        check (ndarray): Numpy's result
-
-    Returns:
-        bool: True if correct, False otherwise
-    """
-    return array_equal(result, check)
+            except ConnectionError:
+                print("ERROR: (Client._work) Connection to server lost")
+                exit(1)
+            
+            except error as msg:
+                print(f"ERROR: (Client._work) {msg}")
+                exit(1)
 
 def print_outcome(result: ndarray, check: ndarray) -> None:
     """
@@ -216,7 +231,7 @@ def print_outcome(result: ndarray, check: ndarray) -> None:
         result (ndarray): Calculated result
         check (ndarray): Numpy's result
     """
-    if verify(result, check):
+    if array_equal(result, check):
         print("CORRECT CALCULATION!")
         exit(0)
 
@@ -239,8 +254,5 @@ if __name__ == "__main__":
     answer = client.get_result()
     print(f"Final Result Matrix = {answer}\n")
 
-    # Get correct answer
-    correct_answer = matrix_a @ matrix_b
-
     # Print outcome (i.e. answer's correctness)
-    print_outcome(answer, correct_answer)
+    print_outcome(answer, matrix_a @ matrix_b)

@@ -1,8 +1,8 @@
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import cpu_count
 from Worker import Worker, DONE
-from numpy import array_split, concatenate, ndarray
-from Shared import LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, generate_matrix, print_outcome
+from numpy import ndarray, array_split, concatenate, array_equal
+from Shared import LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, generate_matrix
 
 N_WORKERS = 4
 
@@ -128,6 +128,22 @@ class Manager(ProcessPoolExecutor):
             self._results[index] = result
 
         return self.combine_results(self._results)
+
+def print_outcome(result: ndarray, check: ndarray) -> None:
+    """
+    Prints calculation's outcome (i.e. correctness)
+
+    Args:
+        result (ndarray): Calculated result
+        check (ndarray): Numpy's result
+    """
+    if array_equal(result, check):
+        print("\nCORRECT CALCULATION!")
+        exit(1)
+
+    else:
+        print("\nINCORRECT CALCULATION...")
+        exit(0)
 
 if __name__ == "__main__":
     # Matrix #1

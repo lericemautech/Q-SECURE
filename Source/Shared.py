@@ -1,6 +1,6 @@
 from socket import socket
 from typing import NamedTuple
-from numpy import ndarray, random, array_equal
+from numpy import ndarray, random
 
 MIN = 0
 MAX = 5
@@ -12,6 +12,12 @@ BUFFER = 4096
 HEADERSIZE = 10
 
 class Address(NamedTuple):
+    """
+    Tuple defining IP Address and port
+
+    Args:
+        NamedTuple (str, int): IP Address and port
+    """
     ip: str
     port: int
 
@@ -26,7 +32,7 @@ def send(sock: socket, data: bytes) -> None:
     # Add header to data packet
     data_with_header = bytes(f"{len(data):<{HEADERSIZE}}", "utf-8") + data
 
-    # Send message back
+    # Send data packet to socket
     sock.sendall(data_with_header)
 
 def receive(sock: socket) -> bytes:
@@ -56,6 +62,7 @@ def receive(sock: socket) -> bytes:
         if len(data) - HEADERSIZE >= msg_length:
             break
 
+    # Remove header from data packet, then return
     return data[HEADERSIZE:HEADERSIZE + msg_length]
 
 def generate_matrix(length: int, width: int) -> ndarray:

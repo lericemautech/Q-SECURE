@@ -26,7 +26,7 @@ class Server():
             Matrix: Multiple of Matrix A and Matrix B, its position
         """
         return Matrix(dot(matrix_a, matrix_b), index)
-
+        
     def _send_client(self, client_socket: socket, data: bytes) -> None:
         """
         Send data to client
@@ -48,7 +48,7 @@ class Server():
         Args:
             client_socket (socket): Client socket
         """
-        try:            
+        try:
             # Receive data from client
             data = receive(client_socket)
 
@@ -74,7 +74,7 @@ class Server():
     def start_server(self) -> None:
         """
         Start server and listen for connections
-        """        
+        """
         try:
             with socket(AF_INET, SOCK_STREAM) as server_socket:
                 # Allow reuse of address

@@ -4,6 +4,7 @@ from numpy import ndarray, random, array_split, array_equal, concatenate, dot
 from queue import Queue
 from random import sample
 from Shared import Address, HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive, send, generate_matrix
+import RSA
 
 ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
 #ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
@@ -13,12 +14,14 @@ class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[Address] = ADDRESSES):
         # IP Address(es) and ports of server(s)
         self._addresses: list[Address] = addresses
+
+        # Dictionary to store results from server(s) (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
+        self._matrix_products: dict[int, ndarray] = { }
         
         # Queue of partitions of Matrix A and Matrix B and their position, to be sent to server(s)
         self._partitions: Queue = self._queue_partitions(matrix_a, matrix_b)
 
-        # Dictionary to store results from server(s) (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
-        self._matrix_products: dict[int, ndarray] = { }
+        self._RSA = RSA.RSA()
 
     def _partition(self, matrix_a: ndarray, matrix_b: ndarray) -> tuple[list[ndarray], list[ndarray]]:
         """
@@ -56,7 +59,13 @@ class Client():
 
         # Add partitions of Matrix A and Matrix B and their position to queue
         for i in range(len(matrix_a_partitions)):
-            queue.put((matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS], i))
+            # Have client compute some of the partitions...
+            if i % VERTICAL_PARTITIONS == 0:
+                self._matrix_products[i] = dot(matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS])
+
+            # ...while server(s) compute the rest
+            else:
+                queue.put((matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS], i))
 
         return queue
 
@@ -94,20 +103,6 @@ class Client():
         # Select random number of servers to send jobs to
         select = random.randint(1, len(self._addresses) + 1)
         print(f"Generated number of servers to send jobs to = {select}\n")
-
-        num_jobs = int(self._partitions.qsize() / (select + 1))
-        
-        # Client computes its share of partitioned matrices
-        for _ in range(num_jobs):
-            # Get partitions
-            matrix_a, matrix_b, index = self._partitions.get()
-
-            # Compute result
-            result = dot(matrix_a, matrix_b)
-            print(f"Result Matrix from Client = {result}\n")
-            
-            # Add result to dict, to be combined into final result later
-            self._matrix_products[index] = result
         
         # Send partitioned matrices to randomly selected server(s)
         self._work(select)

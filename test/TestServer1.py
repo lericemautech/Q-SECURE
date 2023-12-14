@@ -1,5 +1,5 @@
-from Server import Server
-from Client import ADDRESSES
+from src.Server import Server
+from src.Client import ADDRESSES
 
 if __name__ == "__main__":
     # Create server at 1st port in PORTS list

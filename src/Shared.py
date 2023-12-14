@@ -61,9 +61,9 @@ def receive(sock: socket) -> bytes:
 
         if len(data) - HEADERSIZE >= msg_length:
             break
-
+        
     # Remove header from data packet, then return
-    return data[HEADERSIZE:HEADERSIZE + msg_length]
+    return (data[HEADERSIZE:HEADERSIZE + msg_length])
 
 def generate_matrix(length: int, width: int) -> ndarray:
     """

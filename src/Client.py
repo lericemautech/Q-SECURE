@@ -4,10 +4,9 @@ from numpy import ndarray, random, array_split, array_equal, concatenate, dot
 from queue import Queue
 from random import sample
 from Shared import Address, HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive, send, generate_matrix
-import RSA
 
-ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
-#ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
+#ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
+ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
 # VM1/Client, VM2/Server, VM3/Server
 
 class Client():
@@ -20,8 +19,6 @@ class Client():
         
         # Queue of partitions of Matrix A and Matrix B and their position, to be sent to server(s)
         self._partitions: Queue = self._queue_partitions(matrix_a, matrix_b)
-
-        self._RSA = RSA.RSA()
 
     def _partition(self, matrix_a: ndarray, matrix_b: ndarray) -> tuple[list[ndarray], list[ndarray]]:
         """

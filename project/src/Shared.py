@@ -1,4 +1,4 @@
-from socket import socket
+from socket import socket, error
 from typing import NamedTuple
 from numpy import ndarray, random
 
@@ -28,12 +28,27 @@ def send(sock: socket, data: bytes) -> None:
     Args:
         sock (socket): Connected socket
         data (bytes): Data to be sent
+
+    Raises:
+        ConnectionRefusedError: Connection refused
+        ConnectionError: Connection lost
     """
     # Add header to data packet
     data_with_header = bytes(f"{len(data):<{HEADERSIZE}}", "utf-8") + data
 
-    # Send data packet to socket
-    sock.sendall(data_with_header)
+    try:
+        # Send data packet to socket
+        sock.sendall(data_with_header)
+
+    except ConnectionRefusedError:
+        raise ConnectionRefusedError(f"(Shared.send) Connection to {socket} refused")
+        
+    except ConnectionError:
+        raise ConnectionError(f"(Shared.send) Connection to {socket} lost")
+
+    except error as msg:
+        print(f"ERROR: (Shared.send) {msg}")
+        exit(1)
 
 def receive(sock: socket) -> bytes:
     """
@@ -42,6 +57,10 @@ def receive(sock: socket) -> bytes:
     Args:
         sock (socket): Connected socket
 
+    Raises:
+        ConnectionRefusedError: Connection refused
+        ConnectionError: Connection lost
+
     Returns:
         bytes: Received data
     """
@@ -49,7 +68,19 @@ def receive(sock: socket) -> bytes:
     
     # Receive result from socket
     while True:
-        packet = sock.recv(BUFFER)
+        try:
+            packet = sock.recv(BUFFER)
+
+        except ConnectionRefusedError:
+            raise ConnectionRefusedError(f"(Shared.receive) Connection to {socket} refused")
+            
+        except ConnectionError:
+            raise ConnectionError(f"(Shared.receive) Connection to {socket} lost")
+
+        except error as msg:
+            print(f"ERROR: (Shared.receive) {msg}")
+            exit(1)            
+
         if not packet:
             break
         data += packet

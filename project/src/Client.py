@@ -106,7 +106,7 @@ class Client():
         print(f"Generated number of servers to send jobs to = {self._num_servers}\n")
         
         # Send partitioned matrices to randomly selected server(s)
-        self._work(self._num_servers)
+        self._work()
 
         # Return [all] results combined into a single matrix
         return self._combine_results(self._matrix_products)        
@@ -121,6 +121,8 @@ class Client():
 
         Raises:
             ValueError: Invalid acknowledgment (i.e. "ACK" not received from server)
+            ConnectionRefusedError: Connection to server refused
+            ConnectionError: Connection to server lost
 
         Returns:
             bytes: Data received from server
@@ -136,19 +138,16 @@ class Client():
             ack_msg_length = int(ack_data.decode("utf-8").strip())
             ack_msg = client_socket.recv(ack_msg_length).decode("utf-8").strip()
             if ack_msg != "ACK":
-                raise ValueError(f"Invalid acknowledgment: {ack_msg}")
+                raise ValueError(f"(Client._handle_server) Invalid acknowledgment: {ack_msg}")
                                 
             # Receive data from server
             return receive(client_socket)
 
-        # Catch exceptions
         except ConnectionRefusedError:
-            print("ERROR: (Client._handle_server) Connection to server refused")
-            exit(1)
+            raise ConnectionRefusedError(f"(Client._handle_server) Connection to server {socket} refused")
             
         except ConnectionError:
-            print("ERROR: (Client._handle_server) Connection to server lost")
-            exit(1)
+            raise ConnectionError(f"(Client._handle_server) Connection to server {socket} lost")
                 
         except error as msg:
             print(f"ERROR: (Client._handle_server) {msg}")
@@ -161,21 +160,25 @@ class Client():
         Args:
             num_servers (int): Amount of servers to send jobs to
 
+        Raises:
+            ValueError: Invalid number of servers
+            
         Returns:
             list[Address]: List of randomly selected server addresses to send jobs to
         """
         if num_servers > len(self._addresses):
-            raise ValueError(f"ERROR: Number of servers ({num_servers}) exceeds number of addresses ({len(self._addresses)})")
+            raise ValueError(f"(Client._select_servers) Number of servers ({num_servers}) exceeds number of addresses ({len(self._addresses)})")
 
         return sample(self._addresses, num_servers)
 
-    def _work(self, num_servers: int) -> None:
+    def _work(self) -> None:
         """
         Send partitioned matrices to server(s), get results,
         then add them to dictionary for combining laters
 
-        Args:
-            num_servers (int): Amount of servers to send jobs tos
+        Raises:
+            ConnectionRefusedError: Connection refused
+            ConnectionError: Connection lost
         """
         # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0
@@ -218,14 +221,11 @@ class Client():
                     # Increment index
                     i += 1
 
-            # Catch exceptions
             except ConnectionRefusedError:
-                print("ERROR: (Client._work) Connection to server refused")
-                exit(1)
+                raise ConnectionRefusedError("(Client._work) Connection refused")
 
             except ConnectionError:
-                print("ERROR: (Client._work) Connection to server lost")
-                exit(1)
+                raise ConnectionError("(Client._work) Connection lost")
             
             except error as msg:
                 print(f"ERROR: (Client._work) {msg}")

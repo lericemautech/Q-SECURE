@@ -2,7 +2,7 @@ from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
 from numpy import ndarray, dot
 from typing import NamedTuple
-from Shared import Address, receive, send
+from project.src.Shared import Address, receive, send
 
 class Matrix(NamedTuple):
     matrix: ndarray

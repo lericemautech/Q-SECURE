@@ -3,10 +3,10 @@ from pickle import loads, dumps
 from numpy import ndarray, random, array_split, array_equal, concatenate, dot
 from queue import Queue
 from random import sample
-from Shared import Address, HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive, send, generate_matrix
+from project.src.Shared import Address, HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive, send, generate_matrix
 
-#ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
-ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
+ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
+#ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
 # VM1/Client, VM2/Server, VM3/Server
 
 class Client():
@@ -16,6 +16,12 @@ class Client():
 
         # Dictionary to store results from server(s) (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
         self._matrix_products: dict[int, ndarray] = { }
+
+        # Select random number N between 1 and # of Servers, inclusive
+        self._num_servers = random.randint(1, len(self._addresses) + 1)
+
+        # Select random subset of server(s) to send jobs to        
+        self._server_addresses = self._select_servers(self._num_servers)
         
         # Queue of partitions of Matrix A and Matrix B and their position, to be sent to server(s)
         self._partitions: Queue = self._queue_partitions(matrix_a, matrix_b)
@@ -57,7 +63,7 @@ class Client():
         # Add partitions of Matrix A and Matrix B and their position to queue
         for i in range(len(matrix_a_partitions)):
             # Have client compute some of the partitions...
-            if i % VERTICAL_PARTITIONS == 0:
+            if i % (self._num_servers + 1) == 0:
                 self._matrix_products[i] = dot(matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS])
 
             # ...while server(s) compute the rest
@@ -97,12 +103,10 @@ class Client():
         Returns:
             ndarray: Product of Matrix A and Matrix B 
         """
-        # Select random number of servers to send jobs to
-        select = random.randint(1, len(self._addresses) + 1)
-        print(f"Generated number of servers to send jobs to = {select}\n")
+        print(f"Generated number of servers to send jobs to = {self._num_servers}\n")
         
         # Send partitioned matrices to randomly selected server(s)
-        self._work(select)
+        self._work(self._num_servers)
 
         # Return [all] results combined into a single matrix
         return self._combine_results(self._matrix_products)        
@@ -176,9 +180,6 @@ class Client():
         # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0
 
-        # Select random subset of server(s) to send jobs to
-        server_addresses = self._select_servers(num_servers)
-        
         # While there's still partitions to send to server(s)
         while not self._partitions.empty():
             try:
@@ -187,7 +188,7 @@ class Client():
                     client_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
                     # Address of server
-                    server_address = server_addresses[i % len(server_addresses)]
+                    server_address = self._server_addresses[i % len(self._server_addresses)]
 
                     # Connect to server
                     client_socket.connect(server_address)

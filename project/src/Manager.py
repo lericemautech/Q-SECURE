@@ -1,8 +1,8 @@
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import cpu_count
-from Worker import Worker, DONE
+from project.src.Worker import Worker, DONE
 from numpy import ndarray, array_split, concatenate, array_equal
-from Shared import LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, generate_matrix
+from project.src.Shared import LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, generate_matrix
 
 N_WORKERS = 4
 

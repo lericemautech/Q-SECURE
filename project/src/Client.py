@@ -2,8 +2,8 @@ from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
 from numpy import ndarray, random, array_split, array_equal, concatenate, dot
 from queue import Queue
-from random import sample
-from project.src.Shared import Address, HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive, send, generate_matrix
+from os import path
+from project.src.Shared import Address, DIRECTORY_PATH, FILENAME, HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive, send, generate_matrix
 
 ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
 #ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
@@ -155,7 +155,7 @@ class Client():
 
     def _select_servers(self, num_servers: int) -> list[Address]:
         """
-        Selects a random subset of server(s) to send jobs to
+        Selects a subset of server(s) with the highest compute power to send jobs to
 
         Args:
             num_servers (int): Amount of servers to send jobs to
@@ -164,12 +164,25 @@ class Client():
             ValueError: Invalid number of servers
             
         Returns:
-            list[Address]: List of randomly selected server addresses to send jobs to
+            list[Address]: List of server addresses to send jobs to
         """
+        addresses = { }
+        
         if num_servers > len(self._addresses):
             raise ValueError(f"(Client._select_servers) Number of servers ({num_servers}) exceeds number of addresses ({len(self._addresses)})")
 
-        return sample(self._addresses, num_servers)
+        # Read file containing server addresses and their CPU
+        with open(path.join(DIRECTORY_PATH, FILENAME), "r") as file:
+            for line in file:
+                # Get IP Address, port, and CPU of server
+                curr_ip, curr_port, curr_cpu = line.split(" ")[:3]
+                curr_address = Address(curr_ip, int(curr_port))
+
+                # Add server address and CPU to dict if not already in it
+                if curr_address not in addresses.values():
+                    addresses[curr_address] = int(curr_cpu)
+
+        return sorted(addresses)[:num_servers - 1]
 
     def _work(self) -> None:
         """

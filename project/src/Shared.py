@@ -1,6 +1,7 @@
 from socket import socket, error
 from typing import NamedTuple
 from numpy import ndarray, random
+from os import getcwd, path
 
 MIN = 0
 MAX = 5
@@ -10,6 +11,8 @@ HORIZONTAL_PARTITIONS = 2
 VERTICAL_PARTITIONS = 2
 BUFFER = 4096
 HEADERSIZE = 10
+DIRECTORY_PATH = path.join(getcwd(), "project", "file")
+FILENAME = "server_info.txt"
 
 class Address(NamedTuple):
     """

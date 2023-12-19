@@ -2,16 +2,16 @@ from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
 from pickle import loads, dumps
 from numpy import ndarray, dot
 from typing import NamedTuple
-from os import cpu_count, getcwd, path, rename
+from os import cpu_count, path, rename
 from platform import platform
-from project.src.Shared import Address, receive, send
+from project.src.Shared import Address, receive, send, DIRECTORY_PATH, FILENAME
 
 class Matrix(NamedTuple):
     matrix: ndarray
     index: int
 
 class Server():
-    def __init__(self, address: Address, directory_path: str = path.join(getcwd(), "project", "file")):
+    def __init__(self, address: Address, directory_path: str = DIRECTORY_PATH):
         # Server's IP Address and port
         self._server_address = address
 
@@ -26,12 +26,12 @@ class Server():
         # Write Server's IP Address, port, number of cores, and OS to file in directory_path
         self._document_info(directory_path)
 
-    def _document_info(self, directory_path: str, remove_duplicates: bool = False) -> None:
+    def _document_info(self, directory_path: str = DIRECTORY_PATH, remove_duplicates: bool = False) -> None:
         """
         Document server's IP Address, port, number of cores, and OS to "server_info.txt" at directory_path
 
         Args:
-            directory_path (str): Path of the directory to write the file to
+            directory_path (str, optional): Path of the directory to write the file to. Defaults to DIRECTORY_PATH.
             remove_duplicates (bool, optional): Whether to remove entries with the same IP address
             and port as current Server. Defaults to False.
         """
@@ -39,12 +39,12 @@ class Server():
         ip, port = self._server_address.ip, self._server_address.port
 
         # Path of file to write to
-        filepath = path.join(directory_path, "server_info.txt")
+        filepath = path.join(directory_path, FILENAME)
 
         # Removes entries with the same IP Address and port as current Server
         if remove_duplicates:
             # Path of temporary file to write to
-            temp_filepath = path.join(directory_path, "temp_server_info.txt")
+            temp_filepath = path.join(directory_path, f"temp_{FILENAME}")
 
             # Read from original filepath and write to temporary filepath
             with open(filepath, "r") as in_file, open(temp_filepath, "w+") as out_file:

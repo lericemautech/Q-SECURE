@@ -1,4 +1,4 @@
-from socket import socket, error
+from socket import socket
 from typing import NamedTuple
 from numpy import ndarray, random
 from os import getcwd, path

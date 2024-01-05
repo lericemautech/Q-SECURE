@@ -1,9 +1,11 @@
-from project.src.Server import Server as Server
+from project.src.Server import SERVER_LOGGER, Server as Server
 from project.src.Client import ADDRESSES
 
 if __name__ == "__main__":
-    # Create server at 1st port in PORTS list
+    SERVER_LOGGER.info("Initializing Server 1...")
+    # Create server at 1st Address
     server = Server(ADDRESSES[0])
 
     # Start server
+    SERVER_LOGGER.info("Starting Server 1...")
     server.start_server()

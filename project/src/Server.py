@@ -7,7 +7,11 @@ from platform import platform
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging import getLogger, shutdown
 from logging.config import fileConfig
-from project.src.Shared import Address, receive, send, partition, FILE_DIRECTORY_PATH, FILENAME, VERTICAL_PARTITIONS, LOG_CONFIG_PATH
+from time import perf_counter
+from project.src.Shared import Address, timing, receive, send, partition, FILE_DIRECTORY_PATH, FILENAME, VERTICAL_PARTITIONS, LOG_CONFIG_PATH
+
+# TODO Fix logging for server(s)
+# https://docs.python.org/2/howto/logging-cookbook.html#sending-and-receiving-logging-events-across-a-network
 
 SERVER_LOG = "server.log"
 SERVER_LOGGER = getLogger(__name__)
@@ -18,22 +22,28 @@ class Matrix(NamedTuple):
 
 class Server():
     def __init__(self, address: Address, directory_path: str = FILE_DIRECTORY_PATH):
+        if not all(address):
+            error_msg = f"{address} does not have a valid IP Address and/or port"
+            SERVER_LOGGER.error(error_msg)
+            shutdown()
+            raise ValueError(error_msg)
+
         # Logging
         fileConfig(LOG_CONFIG_PATH, defaults = { "logfilename" : SERVER_LOG, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
-
+        
         # Server's IP Address and port
         self._server_address = address
 
         # Check if directory_path exists
         if not path.exists(directory_path):
-            error_msg = f"[Server.__init__] {directory_path} does not exist"
+            error_msg = f"{directory_path} does not exist"
             SERVER_LOGGER.error(error_msg)
             shutdown()
             raise IOError(error_msg)
 
         # Check if directory_path is actually a directory
         if not path.isdir(directory_path):
-            error_msg = f"[Server.__init__] {directory_path} is not a directory"
+            error_msg = f"{directory_path} is not a directory"
             SERVER_LOGGER.error(error_msg)
             shutdown()
             raise NotADirectoryError(error_msg)
@@ -100,10 +110,14 @@ class Server():
         Returns:
             Matrix: Multiple of Matrix A and Matrix B, its position
         """
-        #return Matrix(dot(matrix_a, matrix_b), index)
+        start = perf_counter()
+        product = Matrix(dot(matrix_a, matrix_b), index)
+        end = perf_counter()
+        SERVER_LOGGER.info(f"Multiplied matrices in {timing(end, start)} seconds\n")
+        return product
 
         # TODO Threading ONLY for very large matrices (i.e. LENGTH > 10000?)
-        matrix_a_partitions, matrix_b_partitions = partition(matrix_a, matrix_b)
+        matrix_a_partitions, matrix_b_partitions = partition(matrix_a, matrix_b, SERVER_LOGGER)
         threads, results, num = [ ], empty(len(matrix_a_partitions), dtype = ndarray), 0
 
         # Use threads to multiply partitioned matrices
@@ -152,23 +166,24 @@ class Server():
         Args:
             client_socket (socket): Client socket
         """
+        start = perf_counter()
+        
         # Receive data from client
         data = receive(client_socket)
 
         # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
         matrix_a_partition, matrix_b_partition, index = loads(data)
-        received_msg = f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}"
-        #SERVER_LOGGER.info(f"{received_msg}\n")
-        print(received_msg)
+        print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
 
         # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
         result = self._multiply(matrix_a_partition, matrix_b_partition, index)
-    
+        
         # Convert result to bytes, then send back to client
         self._send_client(client_socket, dumps(result))
-        sent_msg = f"Sent: {result}"
-        #SERVER_LOGGER.info(f"{sent_msg}\n")
-        print(f"\n{sent_msg}\n")
+
+        end = perf_counter()
+        SERVER_LOGGER.info(f"Handled client in {timing(end, start)} seconds\n")
+        print(f"\nSent: {result}\n")
 
     def start_server(self) -> None:
         """
@@ -183,6 +198,8 @@ class Server():
             TimeoutError: Connection timed out
             KeyboardInterrupt: Server disconnected due to keyboard (i.e. CTRL + C)
         """
+        start = perf_counter()
+        
         try:
             with socket(AF_INET, SOCK_STREAM) as server_socket:
                 # Allow reuse of address
@@ -200,60 +217,72 @@ class Server():
                 while True:
                     # Accept connection from client
                     client_socket, client_address = server_socket.accept()
-                    accepted_connection_msg = f"Accepted connection from {client_address}\n"
-                    SERVER_LOGGER.info(accepted_connection_msg)
-                    print(accepted_connection_msg)
+                    SERVER_LOGGER.info(f"Accepted connection from {client_address}\n")
 
                     # Handle client (i.e. get position and partitions of Matrix A and Matrix B,
                     # multiply them, then send result and its position back to client)
                     self._handle_client(client_socket)
 
         except BrokenPipeError as exception:
-            exception_msg = "[Server._start_server] Unable to write to shutdown socket"
+            exception_msg = "Unable to write to shutdown socket"
             SERVER_LOGGER.exception(exception_msg)
+            end = perf_counter()
+            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
             shutdown()
             raise BrokenPipeError(exception_msg) from exception
 
         except ConnectionRefusedError as exception:
-            exception_msg = f"[Server._start_server] Connection refused"
+            exception_msg = f"Connection refused"
             SERVER_LOGGER.exception(exception_msg)
+            end = perf_counter()
+            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
             shutdown()
             raise ConnectionRefusedError(exception_msg) from exception
         
         except ConnectionAbortedError as exception:
-            exception_msg = "[Server._start_server] Connection aborted"
+            exception_msg = "Connection aborted"
             SERVER_LOGGER.exception(exception_msg)
+            end = perf_counter()
+            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
             shutdown()
             raise ConnectionAbortedError(exception_msg) from exception
 
         except ConnectionResetError as exception:
-            exception_msg = "[Server._start_server] Connection reset"
+            exception_msg = "Connection reset"
             SERVER_LOGGER.exception(exception_msg)
+            end = perf_counter()
+            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
             shutdown()
             raise ConnectionResetError(exception_msg) from exception
     
         except ConnectionError as exception:
-            exception_msg = f"[Server._start_server] Connection lost"
+            exception_msg = f"Connection lost"
             SERVER_LOGGER.exception(exception_msg)
+            end = perf_counter()
+            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
             shutdown()
             raise ConnectionError(exception_msg) from exception
 
         except TimeoutError as exception:
-            exception_msg = "[Server._start_server] Connection timed out"
+            exception_msg = "Connection timed out"
             SERVER_LOGGER.exception(exception_msg)
+            end = perf_counter()
+            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
             shutdown()
             raise TimeoutError(exception_msg) from exception
 
         except KeyboardInterrupt:
             msg = f"Server at {self._server_address} disconnected"
             SERVER_LOGGER.info(f"{msg}\n")
-            print(msg)
+            print(f"\n{msg}")
+            end = perf_counter()
+            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
             shutdown()
             exit(0)
 
         except error as exception:
-            exception_msg = f"[Server._start_server] {exception}"
-            SERVER_LOGGER.exception(exception_msg)
-            print(f"EXCEPTION: {exception_msg}")
+            SERVER_LOGGER.exception(exception)
+            end = perf_counter()
+            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
             shutdown()
-            exit(1)
+            raise error(exception) from exception

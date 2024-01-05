@@ -19,6 +19,10 @@ ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address(
 
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[Address] = ADDRESSES):
+        # Logging
+        fileConfig(LOG_CONF_PATH, defaults = { "logfilename" : CLIENT_LOGFILE}, disable_existing_loggers = False)
+        CLIENT_LOGGER.info("Starting Client...\n")
+
         # Store server(s) results (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
         self._matrix_products: dict[int, ndarray] = { }
 
@@ -236,7 +240,7 @@ class Client():
                     # End timer
                     end = perf_counter()
 
-                    CLIENT_LOGGER.info(f"Took Client {round(end - start, SIG_FIGS)} seconds to send and receive data from Server at {server_address}")
+                    CLIENT_LOGGER.info(f"Took Client {round(end - start, SIG_FIGS)} seconds to send and receive data from Server at {server_address}\n")
 
                     # Check if result and index was received (i.e. not None)
                     if result is not None:
@@ -249,7 +253,7 @@ class Client():
                         self._server_reliability[server_address] += 1
 
                     else:
-                        CLIENT_LOGGER.error(f"Failed to receive valid result from Server at {server_address}; retrying later...")
+                        CLIENT_LOGGER.error(f"Failed to receive valid result from Server at {server_address}; retrying later...\n")
 
                         # Put partitions back into queue (since it was previously removed via .get()), to try again later
                         self._partitions.put(partitions)
@@ -257,7 +261,7 @@ class Client():
                         # Decrease server's reliability
                         self._server_reliability[server_address] -= 1
 
-                    CLIENT_LOGGER.info(f"Server at {server_address} has {self._server_reliability[server_address]} points")
+                    CLIENT_LOGGER.info(f"Server at {server_address} has {self._server_reliability[server_address]} points\n")
 
                     # Increment index
                     i += 1
@@ -322,10 +326,6 @@ def print_outcome(result: ndarray, check: ndarray) -> None:
         exit(1)
 
 if __name__ == "__main__":
-    # Logging
-    fileConfig(LOG_CONF_PATH, defaults = { "logfilename" : CLIENT_LOGFILE}, disable_existing_loggers = False)
-    CLIENT_LOGGER.info("Client started")
-    
     # Generate example matrices for testing
     matrix_a = generate_matrix(LENGTH, LENGTH)
     matrix_b = generate_matrix(LENGTH, MATRIX_2_WIDTH)

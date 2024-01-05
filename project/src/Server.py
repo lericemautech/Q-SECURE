@@ -158,7 +158,7 @@ class Server():
         # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
         matrix_a_partition, matrix_b_partition, index = loads(data)
         received_msg = f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}"
-        #SERVER_LOGGER.info(received_msg)
+        #SERVER_LOGGER.info(f"{received_msg}\n")
         print(received_msg)
 
         # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
@@ -167,7 +167,7 @@ class Server():
         # Convert result to bytes, then send back to client
         self._send_client(client_socket, dumps(result))
         sent_msg = f"Sent: {result}"
-        #SERVER_LOGGER.info(sent_msg)
+        #SERVER_LOGGER.info(f"{sent_msg}\n")
         print(f"\n{sent_msg}\n")
 
     def start_server(self) -> None:
@@ -193,8 +193,8 @@ class Server():
 
                 # Listen for connection(s)
                 server_socket.listen()
-                listen_msg = f"Server at {self._server_address} listening for connection(s)...\n"
-                SERVER_LOGGER.info(listen_msg)
+                listen_msg = f"Server at {self._server_address} listening for connection(s)..."
+                SERVER_LOGGER.info(f"{listen_msg}\n")
                 print(listen_msg)
 
                 while True:
@@ -246,8 +246,8 @@ class Server():
 
         except KeyboardInterrupt:
             msg = f"Server at {self._server_address} disconnected"
-            SERVER_LOGGER.info(msg)
-            print(f"\n{msg}")
+            SERVER_LOGGER.info(f"{msg}\n")
+            print(msg)
             shutdown()
             exit(0)
 

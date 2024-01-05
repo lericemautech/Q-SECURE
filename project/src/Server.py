@@ -7,9 +7,9 @@ from platform import platform
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging import getLogger, shutdown
 from logging.config import fileConfig
-from project.src.Shared import Address, receive, send, partition, DIRECTORY_PATH, FILENAME, VERTICAL_PARTITIONS, LOG_CONF_PATH
+from project.src.Shared import Address, receive, send, partition, FILE_DIRECTORY_PATH, FILENAME, VERTICAL_PARTITIONS, LOG_CONFIG_PATH
 
-SERVER_LOGFILE = "server.log"
+SERVER_LOG = "server.log"
 SERVER_LOGGER = getLogger(__name__)
 
 class Matrix(NamedTuple):
@@ -17,9 +17,9 @@ class Matrix(NamedTuple):
     index: int
 
 class Server():
-    def __init__(self, address: Address, directory_path: str = DIRECTORY_PATH):
+    def __init__(self, address: Address, directory_path: str = FILE_DIRECTORY_PATH):
         # Logging
-        fileConfig(LOG_CONF_PATH, defaults = { "logfilename" : SERVER_LOGFILE}, disable_existing_loggers = False)
+        fileConfig(LOG_CONFIG_PATH, defaults = { "logfilename" : SERVER_LOG, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
 
         # Server's IP Address and port
         self._server_address = address
@@ -41,12 +41,12 @@ class Server():
         # Write Server's IP Address, port, number of cores, and OS to file in directory_path
         self._document_info(directory_path)
     
-    def _document_info(self, directory_path: str = DIRECTORY_PATH, filename: str = FILENAME, remove_duplicates: bool = False) -> None:
+    def _document_info(self, directory_path: str = FILE_DIRECTORY_PATH, filename: str = FILENAME, remove_duplicates: bool = False) -> None:
         """
         Document server's IP Address, port, number of cores, and OS to FILENAME at directory_path
 
         Args:
-            directory_path (str, optional): Path of the directory to write the file to; defaults to DIRECTORY_PATH
+            directory_path (str, optional): Path of the directory to write the file to; defaults to FILE_DIRECTORY_PATH
             filename (str, optional): Name of the file to write to; defaults to FILENAME
             remove_duplicates (bool, optional): Whether to remove entries with the same IP address
             and port as current Server; defaults to False

@@ -10,10 +10,10 @@ HORIZONTAL_PARTITIONS = 32
 VERTICAL_PARTITIONS = 2 # Ensure VERTICAL_PARTITIONS is NOT greater than MATRIX_2_WIDTH
 BUFFER = 4096
 HEADERSIZE = 10
-DIRECTORY_PATH = path.join(getcwd(), "project", "file")
+FILE_DIRECTORY_PATH = path.join(getcwd(), "project", "file")
 FILENAME = "server_info.txt"
-LOG_CONF = "log.conf"
-LOG_CONF_PATH = path.join(DIRECTORY_PATH, "logging", LOG_CONF)
+LOG_CONFIG_NAME = "log.conf"
+LOG_CONFIG_PATH = path.join(FILE_DIRECTORY_PATH, "logging", LOG_CONFIG_NAME)
 
 class Address(NamedTuple):
     """

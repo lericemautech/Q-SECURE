@@ -7,11 +7,11 @@ from random import sample
 from time import perf_counter
 from logging import getLogger, shutdown
 from logging.config import fileConfig
-from project.src.Shared import Address, receive, send, generate_matrix, partition, DIRECTORY_PATH, FILENAME, HEADERSIZE, LENGTH, LOG_CONF_PATH
+from project.src.Shared import Address, receive, send, generate_matrix, partition, FILE_DIRECTORY_PATH, FILENAME, HEADERSIZE, LENGTH, LOG_CONFIG_PATH
 
 MATRIX_2_WIDTH = 2
 SIG_FIGS = 5
-CLIENT_LOGFILE = "client.log"
+CLIENT_LOG = "client.log"
 CLIENT_LOGGER = getLogger(__name__)
 # TODO Relocate ADDRESSES to separate file for improved security and editing
 ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
@@ -20,7 +20,7 @@ ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address(
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[Address] = ADDRESSES):
         # Logging
-        fileConfig(LOG_CONF_PATH, defaults = { "logfilename" : CLIENT_LOGFILE}, disable_existing_loggers = False)
+        fileConfig(LOG_CONFIG_PATH, defaults = { "logfilename" : CLIENT_LOG, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
         CLIENT_LOGGER.info("Starting Client...\n")
 
         # Store server(s) results (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
@@ -163,16 +163,16 @@ class Client():
             shutdown()
             raise ValueError(exception_msg)
 
-        filepath = path.join(DIRECTORY_PATH, FILENAME)
+        filepath = path.join(FILE_DIRECTORY_PATH, FILENAME)
 
         if not path.exists(filepath):
-            exception_msg = f"[Client._select_servers] File {FILENAME} at {DIRECTORY_PATH} does not exist"
+            exception_msg = f"[Client._select_servers] File {FILENAME} at {FILE_DIRECTORY_PATH} does not exist"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise FileNotFoundError(exception_msg)
 
         if path.getsize(filepath) == 0:
-            exception_msg = f"[Client._select_servers] File {FILENAME} at {DIRECTORY_PATH} is empty"
+            exception_msg = f"[Client._select_servers] File {FILENAME} at {FILE_DIRECTORY_PATH} is empty"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise IOError(exception_msg)

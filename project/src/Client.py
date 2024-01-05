@@ -7,10 +7,9 @@ from random import sample
 from time import perf_counter
 from logging import getLogger, shutdown
 from logging.config import fileConfig
-from project.src.Shared import Address, receive, send, generate_matrix, partition, FILE_DIRECTORY_PATH, FILENAME, HEADERSIZE, LENGTH, LOG_CONFIG_PATH, VERTICAL_PARTITIONS
+from project.src.Shared import Address, receive, send, generate_matrix, partition, timing, FILE_DIRECTORY_PATH, FILENAME, HEADERSIZE, LENGTH, LOG_CONFIG_PATH, VERTICAL_PARTITIONS
 
 MATRIX_2_WIDTH = 2
-SIG_FIGS = 5
 CLIENT_LOG = "client.log"
 CLIENT_LOGGER = getLogger(__name__)
 # TODO Relocate ADDRESSES to separate file for improved security and editing
@@ -19,6 +18,8 @@ ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address(
 
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[Address] = ADDRESSES):
+        # Logging
+        fileConfig(LOG_CONFIG_PATH, defaults = { "logfilename" : CLIENT_LOG, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
         CLIENT_LOGGER.info("Starting Client...\n")
 
         # Store server(s) results (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
@@ -47,11 +48,13 @@ class Client():
         Returns:
             Queue: Queue of partitions of Matrix A and Matrix B and their position
         """
+        # Get partitions of Matrix A and Matrix B
+        matrix_a_partitions, matrix_b_partitions = partition(matrix_a, matrix_b, CLIENT_LOGGER)
+
+        start = perf_counter()
+        
         # Declare queue to be populated and returned
         queue = Queue()
-
-        # Get partitions of Matrix A and Matrix B
-        matrix_a_partitions, matrix_b_partitions = partition(matrix_a, matrix_b)
 
         # Add partitions of Matrix A and Matrix B and their position to queue
         for i in range(len(matrix_a_partitions)):
@@ -63,11 +66,14 @@ class Client():
             else:
                 queue.put((matrix_a_partitions[i], matrix_b_partitions[i % len(matrix_b_partitions)], i))
 
+        end = perf_counter()
+        CLIENT_LOGGER.info(f"Queued partitions in {timing(end, start)} seconds\n")
+        
         return queue
 
     def _combine_results(self, matrix_products: dict[int, ndarray]) -> ndarray:
         """
-        Combines all separate submatrices into a single matrix
+        Combines submatrices into a single matrix
 
         Args:
             matrix_products (dict[int, ndarray]): Dictionary to store results (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
@@ -75,6 +81,8 @@ class Client():
         Returns:
             ndarray: Combined result of given matrices
         """
+        start = perf_counter()
+        
         # Get all results from the queue, sorted by its position
         results = [value for _, value in sorted(matrix_products.items())]
 
@@ -87,7 +95,12 @@ class Client():
             combined_results.append(sum(results[i:end]))
 
         # Combine all results into a single matrix
-        return concatenate(combined_results)
+        combined_results = concatenate(combined_results)
+
+        end = perf_counter()
+        CLIENT_LOGGER.info(f"Combined submatrices into a single matrix in {timing(end, start)} seconds\n")
+        
+        return combined_results
 
     def get_result(self) -> ndarray:
         """
@@ -97,12 +110,19 @@ class Client():
             ndarray: Product of Matrix A and Matrix B 
         """
         CLIENT_LOGGER.info(f"Generated number of servers to send jobs to = {self._num_servers}\n")
+
+        start = perf_counter()
         
         # Send partitioned matrices to randomly selected server(s)
         self._work()
 
-        # Return [all] results combined into a single matrix
-        return self._combine_results(self._matrix_products)        
+        # Get [all] results combined into a single matrix
+        result = self._combine_results(self._matrix_products)
+
+        end = perf_counter()
+        CLIENT_LOGGER.info(f"Calculated final result in {timing(end, start)} seconds\n")
+
+        return result
 
     def _handle_server(self, server_socket: socket, data: bytes) -> bytes:
         """
@@ -118,9 +138,15 @@ class Client():
         Returns:
             bytes: Data received from server
         """
+        start_send = perf_counter()
+        
         # Add header to and send data packet to server
         send(server_socket, data)
 
+        end_send = perf_counter()
+        CLIENT_LOGGER.info(f"Sent data in {timing(end_send, start_send)} seconds\n")
+        start_receive = perf_counter()
+        
         # Receive acknowledgment from server
         ack_data = server_socket.recv(HEADERSIZE)
 
@@ -128,13 +154,18 @@ class Client():
         ack_msg_length = int(ack_data.decode("utf-8").strip())
         ack_msg = server_socket.recv(ack_msg_length).decode("utf-8").strip()
         if ack_msg != "ACK":
-            error_msg = f"[Client._handle_server] Invalid acknowledgment \"{ack_msg}\""
+            error_msg = f"Invalid acknowledgment \"{ack_msg}\""
             CLIENT_LOGGER.error(error_msg)
             shutdown()
             raise ValueError(error_msg)
                             
         # Receive data from server
-        return receive(server_socket)
+        data = receive(server_socket)
+
+        end_receive = perf_counter()
+        CLIENT_LOGGER.info(f"Received data in {timing(end_receive, start_receive)} seconds\n")
+
+        return data
 
     def _select_servers(self, addresses: list[Address], num_servers: int) -> list[Address]:
         """
@@ -156,7 +187,7 @@ class Client():
         selected_servers = { }
         
         if num_servers > len(addresses) or num_servers < 1:
-            error_msg = f"[Client._select_servers] {num_servers} is an invalid number of servers"
+            error_msg = f"{num_servers} is an invalid number of servers"
             CLIENT_LOGGER.error(error_msg)
             shutdown()
             raise ValueError(error_msg)
@@ -164,13 +195,13 @@ class Client():
         filepath = path.join(FILE_DIRECTORY_PATH, FILENAME)
 
         if not path.exists(filepath):
-            error_msg = f"[Client._select_servers] File {FILENAME} at {FILE_DIRECTORY_PATH} does not exist"
+            error_msg = f"File {FILENAME} at {FILE_DIRECTORY_PATH} does not exist"
             CLIENT_LOGGER.error(error_msg)
             shutdown()
             raise FileNotFoundError(error_msg)
 
         if path.getsize(filepath) == 0:
-            error_msg = f"[Client._select_servers] File {FILENAME} at {FILE_DIRECTORY_PATH} is empty"
+            error_msg = f"File {FILENAME} at {FILE_DIRECTORY_PATH} is empty"
             CLIENT_LOGGER.error(error_msg)
             shutdown()
             raise IOError(error_msg)
@@ -210,6 +241,8 @@ class Client():
         # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0
 
+        start_work = perf_counter()
+
         # While there's still partitions to send to server(s)
         while not self._partitions.empty():
             try:
@@ -225,6 +258,8 @@ class Client():
 
                     # Connect to server
                     client_socket.connect(server_address)
+                    connection_timer = perf_counter()
+                    CLIENT_LOGGER.info(f"Client connected to Server at {server_address} in {timing(connection_timer, start)} seconds\n")
 
                     # Get partitions to send to server
                     partitions = self._partitions.get(timeout = 0.1)
@@ -238,7 +273,7 @@ class Client():
                     # End timer
                     end = perf_counter()
 
-                    CLIENT_LOGGER.info(f"Took Client {round(end - start, SIG_FIGS)} seconds to send and receive data from Server at {server_address}\n")
+                    CLIENT_LOGGER.info(f"Took Client {timing(end, start)} seconds to connect, send, receive, and unpack data from Server at {server_address}\n")
 
                     # Check if result and index was received (i.e. not None)
                     if result is not None:
@@ -265,45 +300,46 @@ class Client():
                     i += 1
 
             except BrokenPipeError as exception:
-                exception_msg = "[Client._work] Unable to write to shutdown socket"
+                exception_msg = "Unable to write to shutdown socket"
                 CLIENT_LOGGER.exception(exception_msg)
-                shutdown()
                 raise BrokenPipeError(exception_msg) from exception
 
             except ConnectionRefusedError as exception:
-                exception_msg = "[Client._work] Connection refused"
+                exception_msg = "Connection refused"
                 CLIENT_LOGGER.exception(exception_msg)
-                shutdown()
                 raise ConnectionRefusedError(exception_msg) from exception
 
             except ConnectionAbortedError as exception:
-                exception_msg = "[Client._work] Connection aborted"
+                exception_msg = "Connection aborted"
                 CLIENT_LOGGER.exception(exception_msg)
-                shutdown()
                 raise ConnectionAbortedError(exception_msg) from exception
 
             except ConnectionResetError as exception:
-                exception_msg = "[Client._work] Connection reset"
+                exception_msg = "Connection reset"
                 CLIENT_LOGGER.exception(exception_msg)
-                shutdown()
                 raise ConnectionResetError(exception_msg) from exception
 
             except ConnectionError as exception:
-                exception_msg = "[Client._work] Connection lost"
+                exception_msg = "Connection lost"
                 CLIENT_LOGGER.exception(exception_msg)
-                shutdown()
                 raise ConnectionError(exception_msg) from exception
 
             except TimeoutError as exception:
-                exception_msg = "[Client._work] Connection timed out"
+                exception_msg = "Connection timed out"
                 CLIENT_LOGGER.exception(exception_msg)
-                shutdown()
                 raise TimeoutError(exception_msg) from exception
 
-            except error as msg:
-                CLIENT_LOGGER.exception(f"[Client._work] {msg}")
+            except error as exception:
+                CLIENT_LOGGER.exception(exception)
+                raise error from exception
+
+            finally:
+                end_work = perf_counter()
+                CLIENT_LOGGER.info(f"Client worked for {timing(end_work, start_work)} seconds")
                 shutdown()
-                exit(1)
+
+        # end_work = perf_counter()
+        # CLIENT_LOGGER.info(f"Client worked for {timing(end_work, start_work)} seconds")
 
 def print_outcome(result: ndarray, check: ndarray) -> None:
     """
@@ -324,12 +360,9 @@ def print_outcome(result: ndarray, check: ndarray) -> None:
         exit(1)
 
 if __name__ == "__main__":
-    # Logging
-    fileConfig(LOG_CONFIG_PATH, defaults = { "logfilename" : CLIENT_LOG, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
-
     # Ensure 2nd matrix width is not smaller than number of vertical partitions
     if MATRIX_2_WIDTH < VERTICAL_PARTITIONS:
-        error_msg = f"[Client.__main__] 2nd matrix's width ({MATRIX_2_WIDTH}) cannot be smaller than number of vertical partitions ({VERTICAL_PARTITIONS})"
+        error_msg = f"2nd matrix's width ({MATRIX_2_WIDTH}) cannot be smaller than number of vertical partitions ({VERTICAL_PARTITIONS})"
         CLIENT_LOGGER.error(error_msg)
         shutdown()
         raise ValueError(error_msg)
@@ -344,12 +377,8 @@ if __name__ == "__main__":
     # Create Client to multiply matrices
     client = Client(matrix_a, matrix_b)
 
-    # Start timer
-    start = perf_counter()
-
     # Get result
     answer = client.get_result()
-    CLIENT_LOGGER.info(f"Took {round(perf_counter() - start, SIG_FIGS)} seconds to get result")
     print(f"Final Result Matrix = {answer}\n")
 
     # Print outcome (i.e. answer's correctness)

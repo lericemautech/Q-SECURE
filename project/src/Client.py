@@ -1,47 +1,37 @@
-from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, error
+from socket import socket, error, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
-from numpy import ndarray, random, array_split, array_equal, concatenate, dot
+from numpy import ndarray, random, array_equal, concatenate, dot, shape
 from queue import Queue
 from os import path
-from project.src.Shared import Address, DIRECTORY_PATH, FILENAME, HEADERSIZE, LENGTH, MATRIX_2_WIDTH, HORIZONTAL_PARTITIONS, VERTICAL_PARTITIONS, receive, send, generate_matrix
+from random import sample
+from time import perf_counter
+from logging import getLogger
+from logging.config import fileConfig
+from project.src.Shared import Address, receive, send, generate_matrix, partition, DIRECTORY_PATH, FILENAME, HEADERSIZE, LENGTH, LOG_CONF_PATH
 
+MATRIX_2_WIDTH = 2
+SIG_FIGS = 5
+CLIENT_LOGFILE = "client.log"
+CLIENT_LOGGER = getLogger(__name__)
 ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
 #ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
-# VM1/Client, VM2/Server, VM3/Server
 
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[Address] = ADDRESSES):
-        # IP Address(es) and ports of server(s)
-        self._addresses: list[Address] = addresses
-
-        # Dictionary to store results from server(s) (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
+        # Store server(s) results (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
         self._matrix_products: dict[int, ndarray] = { }
 
         # Select random number N between 1 and # of Servers, inclusive
-        self._num_servers = random.randint(1, len(self._addresses) + 1)
+        self._num_servers: int = random.randint(1, len(addresses) + 1)
 
         # Select random subset of server(s) to send jobs to        
-        self._server_addresses = self._select_servers(self._num_servers)
+        self._server_addresses: list[Address] = self._select_servers(addresses, self._num_servers)
         
-        # Queue of partitions of Matrix A and Matrix B and their position, to be sent to server(s)
+        # Queue of partitions of Matrix A and Matrix B and their position, to be sent to selected server(s)
         self._partitions: Queue = self._queue_partitions(matrix_a, matrix_b)
 
-    def _partition(self, matrix_a: ndarray, matrix_b: ndarray) -> tuple[list[ndarray], list[ndarray]]:
-        """
-        Partition Matrix A and Matrix B into submatrices
-
-        Args:
-            matrix_a (ndarray): Matrix A to be partitioned
-            matrix_b (ndarray): Matrix B to be partitioned
-
-        Returns:
-            tuple[list[ndarray], list[ndarray]]: Partitioned Matrix A and Matrix B
-        """
-        # Split matrix horizontally
-        sub_matrices = array_split(matrix_a, HORIZONTAL_PARTITIONS, axis = 0)
-        
-        # Split submatrices vertically, then return
-        return [m for sub_matrix in sub_matrices for m in  array_split(sub_matrix, VERTICAL_PARTITIONS, axis = 1)], array_split(matrix_b, VERTICAL_PARTITIONS, axis = 0)
+        # Determine which selected server(s) to send jobs to; initialize all selected server(s) with 0 points
+        self._server_reliability: dict[Address, int] = { address: 0 for address in self._server_addresses }
 
     def _queue_partitions(self, matrix_a: ndarray, matrix_b: ndarray) -> Queue:
         """
@@ -58,17 +48,17 @@ class Client():
         queue = Queue()
 
         # Get partitions of Matrix A and Matrix B
-        matrix_a_partitions, matrix_b_partitions = self._partition(matrix_a, matrix_b)
+        matrix_a_partitions, matrix_b_partitions = partition(matrix_a, matrix_b)
 
         # Add partitions of Matrix A and Matrix B and their position to queue
         for i in range(len(matrix_a_partitions)):
-            # Have client compute some of the partitions...
+            # Have client compute some of the partitions; add 1 to num_servers to account for client
             if i % (self._num_servers + 1) == 0:
-                self._matrix_products[i] = dot(matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS])
+                self._matrix_products[i] = dot(matrix_a_partitions[i], matrix_b_partitions[i % len(matrix_b_partitions)])
 
             # ...while server(s) compute the rest
             else:
-                queue.put((matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS], i))
+                queue.put((matrix_a_partitions[i], matrix_b_partitions[i % len(matrix_b_partitions)], i))
 
         return queue
 
@@ -82,15 +72,15 @@ class Client():
         Returns:
             ndarray: Combined result of given matrices
         """
-        # Declare list for storing combined results, and end index
-        combined_results, end = [], 0
-
         # Get all results from the queue, sorted by its position
         results = [value for _, value in sorted(matrix_products.items())]
 
+        # Number of columns, end index, and list for storing combined results
+        num_columns, end, combined_results = shape(results[0])[1], 0, []
+
         # Sum all values in the same row, then add to combined_results
-        for i in range(0, len(results), VERTICAL_PARTITIONS):
-            end += VERTICAL_PARTITIONS
+        for i in range(0, len(results), num_columns):
+            end += num_columns
             combined_results.append(sum(results[i:end]))
 
         # Combine all results into a single matrix
@@ -103,7 +93,7 @@ class Client():
         Returns:
             ndarray: Product of Matrix A and Matrix B 
         """
-        print(f"Generated number of servers to send jobs to = {self._num_servers}\n")
+        CLIENT_LOGGER.info(f"Generated number of servers to send jobs to = {self._num_servers}\n")
         
         # Send partitioned matrices to randomly selected server(s)
         self._work()
@@ -111,78 +101,91 @@ class Client():
         # Return [all] results combined into a single matrix
         return self._combine_results(self._matrix_products)        
 
-    def _handle_server(self, client_socket: socket, data: bytes) -> bytes:
+    def _handle_server(self, server_socket: socket, data: bytes) -> bytes:
         """
         Exchange data with server
 
         Args:
-            client_socket (socket): Client socket
+            server_socket (socket): Server socket
             data (bytes): Data to be sent
 
         Raises:
-            ValueError: Invalid acknowledgment (i.e. "ACK" not received from server)
-            ConnectionRefusedError: Connection to server refused
-            ConnectionError: Connection to server lost
+            ValueError: Invalid acknowledgment
 
         Returns:
             bytes: Data received from server
         """
-        try:
-            # Add header to and send data packet to server
-            send(client_socket, data)
+        # Add header to and send data packet to server
+        send(server_socket, data)
 
-            # Receive acknowledgment from server
-            ack_data = client_socket.recv(HEADERSIZE)
+        # Receive acknowledgment from server
+        ack_data = server_socket.recv(HEADERSIZE)
 
-            # Verify acknowledgment
-            ack_msg_length = int(ack_data.decode("utf-8").strip())
-            ack_msg = client_socket.recv(ack_msg_length).decode("utf-8").strip()
-            if ack_msg != "ACK":
-                raise ValueError(f"(Client._handle_server) Invalid acknowledgment: {ack_msg}")
-                                
-            # Receive data from server
-            return receive(client_socket)
+        # Verify acknowledgment
+        ack_msg_length = int(ack_data.decode("utf-8").strip())
+        ack_msg = server_socket.recv(ack_msg_length).decode("utf-8").strip()
+        if ack_msg != "ACK":
+            exception_msg = f"(Client._handle_server) Invalid acknowledgment \"{ack_msg}\""
+            CLIENT_LOGGER.exception(exception_msg)
+            raise ValueError(exception_msg) from None
+                            
+        # Receive data from server
+        return receive(server_socket)
 
-        except ConnectionRefusedError:
-            raise ConnectionRefusedError(f"(Client._handle_server) Connection to server {socket} refused")
-            
-        except ConnectionError:
-            raise ConnectionError(f"(Client._handle_server) Connection to server {socket} lost")
-                
-        except error as msg:
-            print(f"ERROR: (Client._handle_server) {msg}")
-            exit(1)
-
-    def _select_servers(self, num_servers: int) -> list[Address]:
+    def _select_servers(self, addresses: list[Address], num_servers: int) -> list[Address]:
         """
-        Selects a subset of server(s) with the highest compute power to send jobs to
+        Selects a subset of server(s) with the highest compute power (i.e. most CPUs) to send jobs to
 
         Args:
+            addresses (list[Address]): List of server addresses
             num_servers (int): Amount of servers to send jobs to
 
         Raises:
             ValueError: Invalid number of servers
+            FileNotFoundError: File containing server information does not exist
+            IOError: File containing server information is empty
             
         Returns:
             list[Address]: List of server addresses to send jobs to
         """
-        addresses = { }
+        # TODO
+        selected_servers = { }
         
-        if num_servers > len(self._addresses):
-            raise ValueError(f"(Client._select_servers) Number of servers ({num_servers}) exceeds number of addresses ({len(self._addresses)})")
+        if num_servers > len(addresses) or num_servers < 1:
+            exception_msg = f"(Client._select_servers) {num_servers} is an invalid number of servers"
+            CLIENT_LOGGER.exception(exception_msg)
+            raise ValueError(exception_msg) from None
+
+        filepath = path.join(DIRECTORY_PATH, FILENAME)
+
+        if not path.exists(filepath):
+            exception_msg = f"(Client._select_servers) File {FILENAME} at {DIRECTORY_PATH} does not exist"
+            CLIENT_LOGGER.exception(exception_msg)
+            raise FileNotFoundError(exception_msg) from None
+
+        if path.getsize(filepath) == 0:
+            exception_msg = f"(Client._select_servers) File {FILENAME} at {DIRECTORY_PATH} is empty"
+            CLIENT_LOGGER.exception(exception_msg)
+            raise IOError(exception_msg) from None
 
         # Read file containing server addresses and their CPU
-        with open(path.join(DIRECTORY_PATH, FILENAME), "r") as file:
+        with open(filepath, "r") as file:
             for line in file:
                 # Get IP Address, port, and CPU of server
                 curr_ip, curr_port, curr_cpu = line.split(" ")[:3]
                 curr_address = Address(curr_ip, int(curr_port))
 
                 # Add server address and CPU to dict if not already in it
-                if curr_address not in addresses.values():
-                    addresses[curr_address] = int(curr_cpu)
+                if curr_address not in selected_servers.keys():
+                    selected_servers[curr_address] = int(curr_cpu)
 
-        return sorted(addresses)[:num_servers - 1]
+        # Check if all selected servers have the same CPU power
+        if len(set(selected_servers.values())) == 1:
+            # If so, choose randomly from selected servers
+            return sample(list(selected_servers.keys()), num_servers)
+
+        # Otherwise, return the top servers (i.e. servers with highest CPU power)
+        return sorted(selected_servers, reverse = True)[:num_servers]
 
     def _work(self) -> None:
         """
@@ -190,8 +193,12 @@ class Client():
         then add them to dictionary for combining laters
 
         Raises:
+            BrokenPipeError: Unable to write to shutdown socket
             ConnectionRefusedError: Connection refused
+            ConnectionAbortedError: Connection aborted
+            ConnectionResetError: Connection reset
             ConnectionError: Connection lost
+            TimeoutError: Connection timed out
         """
         # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0
@@ -206,11 +213,14 @@ class Client():
                     # Address of server
                     server_address = self._server_addresses[i % len(self._server_addresses)]
 
+                    # Start timer
+                    start = perf_counter()
+
                     # Connect to server
                     client_socket.connect(server_address)
 
                     # Get partitions to send to server
-                    partitions = self._partitions.get()
+                    partitions = self._partitions.get(timeout = 0.1)
 
                     # Receive result from server
                     data = self._handle_server(client_socket, dumps(partitions))
@@ -218,30 +228,67 @@ class Client():
                     # Unpack data (i.e. product of partitions and its position) from server
                     result, index = loads(data)
 
+                    # End timer
+                    end = perf_counter()
+
+                    CLIENT_LOGGER.info(f"Took Client {round(end - start, SIG_FIGS)} seconds to send and receive data from Server at {server_address}")
+
                     # Check if result and index was received (i.e. not None)
                     if result is not None:
-                        print(f"Result Matrix from Server at {server_address} = {result}\n")
+                        #print(f"Result Matrix from Server at {server_address} = {result}\n")
 
                         # Add result to dict, to be combined into final result later
                         self._matrix_products[index] = result
 
+                        # Increase server's reliability
+                        self._server_reliability[server_address] += 1
+
                     else:
-                        print(f"Failed to receive result from Server at {server_address}; retrying later...\n")
+                        CLIENT_LOGGER.error(f"Failed to receive valid result from Server at {server_address}; retrying later...")
 
                         # Put partitions back into queue (since it was previously removed via .get()), to try again later
                         self._partitions.put(partitions)
 
+                        # Decrease server's reliability
+                        self._server_reliability[server_address] -= 1
+
+                    CLIENT_LOGGER.info(f"Server at {server_address} has {self._server_reliability[server_address]} points")
+
                     # Increment index
                     i += 1
 
+            except BrokenPipeError:
+                exception_msg = "(Client._work) Unable to write to shutdown socket"
+                CLIENT_LOGGER.exception(exception_msg)
+                raise BrokenPipeError(exception_msg) from None
+
             except ConnectionRefusedError:
-                raise ConnectionRefusedError("(Client._work) Connection refused")
+                exception_msg = "(Client._work) Connection refused"
+                CLIENT_LOGGER.exception(exception_msg)
+                raise ConnectionRefusedError(exception_msg) from None
+
+            except ConnectionAbortedError:
+                exception_msg = "(Client._work) Connection aborted"
+                CLIENT_LOGGER.exception(exception_msg)
+                raise ConnectionAbortedError(exception_msg) from None
+
+            except ConnectionResetError:
+                exception_msg = "(Client._work) Connection reset"
+                CLIENT_LOGGER.exception(exception_msg)
+                raise ConnectionResetError(exception_msg) from None
 
             except ConnectionError:
-                raise ConnectionError("(Client._work) Connection lost")
-            
+                exception_msg = "(Client._work) Connection lost"
+                CLIENT_LOGGER.exception(exception_msg)
+                raise ConnectionError(exception_msg) from None
+
+            except TimeoutError:
+                exception_msg = "(Client._work) Connection timed out"
+                CLIENT_LOGGER.exception(exception_msg)
+                raise TimeoutError(exception_msg) from None
+
             except error as msg:
-                print(f"ERROR: (Client._work) {msg}")
+                CLIENT_LOGGER.exception(f"(Client._work) {msg}")
                 exit(1)
 
 def print_outcome(result: ndarray, check: ndarray) -> None:
@@ -261,18 +308,27 @@ def print_outcome(result: ndarray, check: ndarray) -> None:
         exit(1)
 
 if __name__ == "__main__":
+    # Logging
+    fileConfig(LOG_CONF_PATH, defaults = { "logfilename" : CLIENT_LOGFILE}, disable_existing_loggers = False)
+    CLIENT_LOGGER.info("\n==============================================\n")
+    CLIENT_LOGGER.info("Client started")
+    
     # Generate example matrices for testing
     matrix_a = generate_matrix(LENGTH, LENGTH)
     matrix_b = generate_matrix(LENGTH, MATRIX_2_WIDTH)
 
-    #print(f"Matrix A: {matrix_a}\n")
-    #print(f"Matrix B: {matrix_b}\n")
+    print(f"Matrix A: {matrix_a}\n")
+    print(f"Matrix B: {matrix_b}\n")
 
     # Create Client to multiply matrices
     client = Client(matrix_a, matrix_b)
 
+    # Start timer
+    start = perf_counter()
+
     # Get result
     answer = client.get_result()
+    CLIENT_LOGGER.info(f"Took {round(perf_counter() - start, SIG_FIGS)} seconds to get result")
     print(f"Final Result Matrix = {answer}\n")
 
     # Print outcome (i.e. answer's correctness)

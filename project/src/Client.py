@@ -335,7 +335,7 @@ class Client():
 
             finally:
                 end_work = perf_counter()
-                CLIENT_LOGGER.info(f"Client worked for {timing(end_work, start_work)} seconds")
+                CLIENT_LOGGER.info(f"Client worked for {timing(end_work, start_work)} seconds\n")
                 shutdown()
 
         # end_work = perf_counter()

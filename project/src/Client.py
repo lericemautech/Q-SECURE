@@ -5,7 +5,7 @@ from queue import Queue
 from os import path
 from random import sample
 from time import perf_counter
-from logging import getLogger
+from logging import getLogger, shutdown
 from logging.config import fileConfig
 from project.src.Shared import Address, receive, send, generate_matrix, partition, DIRECTORY_PATH, FILENAME, HEADERSIZE, LENGTH, LOG_CONF_PATH
 
@@ -13,6 +13,7 @@ MATRIX_2_WIDTH = 2
 SIG_FIGS = 5
 CLIENT_LOGFILE = "client.log"
 CLIENT_LOGGER = getLogger(__name__)
+# TODO Relocate ADDRESSES to separate file for improved security and editing
 ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
 #ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
 
@@ -127,6 +128,7 @@ class Client():
         if ack_msg != "ACK":
             exception_msg = f"(Client._handle_server) Invalid acknowledgment \"{ack_msg}\""
             CLIENT_LOGGER.exception(exception_msg)
+            shutdown()
             raise ValueError(exception_msg) from None
                             
         # Receive data from server
@@ -161,11 +163,13 @@ class Client():
         if not path.exists(filepath):
             exception_msg = f"(Client._select_servers) File {FILENAME} at {DIRECTORY_PATH} does not exist"
             CLIENT_LOGGER.exception(exception_msg)
+            shutdown()
             raise FileNotFoundError(exception_msg) from None
 
         if path.getsize(filepath) == 0:
             exception_msg = f"(Client._select_servers) File {FILENAME} at {DIRECTORY_PATH} is empty"
             CLIENT_LOGGER.exception(exception_msg)
+            shutdown()
             raise IOError(exception_msg) from None
 
         # Read file containing server addresses and their CPU
@@ -260,35 +264,42 @@ class Client():
             except BrokenPipeError:
                 exception_msg = "(Client._work) Unable to write to shutdown socket"
                 CLIENT_LOGGER.exception(exception_msg)
+                shutdown()
                 raise BrokenPipeError(exception_msg) from None
 
             except ConnectionRefusedError:
                 exception_msg = "(Client._work) Connection refused"
                 CLIENT_LOGGER.exception(exception_msg)
+                shutdown()
                 raise ConnectionRefusedError(exception_msg) from None
 
             except ConnectionAbortedError:
                 exception_msg = "(Client._work) Connection aborted"
                 CLIENT_LOGGER.exception(exception_msg)
+                shutdown()
                 raise ConnectionAbortedError(exception_msg) from None
 
             except ConnectionResetError:
                 exception_msg = "(Client._work) Connection reset"
                 CLIENT_LOGGER.exception(exception_msg)
+                shutdown()
                 raise ConnectionResetError(exception_msg) from None
 
             except ConnectionError:
                 exception_msg = "(Client._work) Connection lost"
                 CLIENT_LOGGER.exception(exception_msg)
+                shutdown()
                 raise ConnectionError(exception_msg) from None
 
             except TimeoutError:
                 exception_msg = "(Client._work) Connection timed out"
                 CLIENT_LOGGER.exception(exception_msg)
+                shutdown()
                 raise TimeoutError(exception_msg) from None
 
             except error as msg:
                 CLIENT_LOGGER.exception(f"(Client._work) {msg}")
+                shutdown()
                 exit(1)
 
 def print_outcome(result: ndarray, check: ndarray) -> None:
@@ -301,10 +312,12 @@ def print_outcome(result: ndarray, check: ndarray) -> None:
     """
     if array_equal(result, check):
         print("CORRECT CALCULATION!")
+        shutdown()
         exit(0)
 
     else:
         print("INCORRECT CALCULATION...")
+        shutdown()
         exit(1)
 
 if __name__ == "__main__":

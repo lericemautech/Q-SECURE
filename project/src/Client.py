@@ -7,7 +7,7 @@ from random import sample
 from time import perf_counter
 from logging import getLogger, shutdown
 from logging.config import fileConfig
-from project.src.Shared import Address, receive, send, generate_matrix, partition, FILE_DIRECTORY_PATH, FILENAME, HEADERSIZE, LENGTH, LOG_CONFIG_PATH
+from project.src.Shared import Address, receive, send, generate_matrix, partition, FILE_DIRECTORY_PATH, FILENAME, HEADERSIZE, LENGTH, LOG_CONFIG_PATH, VERTICAL_PARTITIONS
 
 MATRIX_2_WIDTH = 2
 SIG_FIGS = 5
@@ -19,8 +19,6 @@ ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address(
 
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[Address] = ADDRESSES):
-        # Logging
-        fileConfig(LOG_CONFIG_PATH, defaults = { "logfilename" : CLIENT_LOG, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
         CLIENT_LOGGER.info("Starting Client...\n")
 
         # Store server(s) results (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
@@ -130,10 +128,10 @@ class Client():
         ack_msg_length = int(ack_data.decode("utf-8").strip())
         ack_msg = server_socket.recv(ack_msg_length).decode("utf-8").strip()
         if ack_msg != "ACK":
-            exception_msg = f"[Client._handle_server] Invalid acknowledgment \"{ack_msg}\""
-            CLIENT_LOGGER.exception(exception_msg)
+            error_msg = f"[Client._handle_server] Invalid acknowledgment \"{ack_msg}\""
+            CLIENT_LOGGER.error(error_msg)
             shutdown()
-            raise ValueError(exception_msg)
+            raise ValueError(error_msg)
                             
         # Receive data from server
         return receive(server_socket)
@@ -158,24 +156,24 @@ class Client():
         selected_servers = { }
         
         if num_servers > len(addresses) or num_servers < 1:
-            exception_msg = f"[Client._select_servers] {num_servers} is an invalid number of servers"
-            CLIENT_LOGGER.exception(exception_msg)
+            error_msg = f"[Client._select_servers] {num_servers} is an invalid number of servers"
+            CLIENT_LOGGER.error(error_msg)
             shutdown()
-            raise ValueError(exception_msg)
+            raise ValueError(error_msg)
 
         filepath = path.join(FILE_DIRECTORY_PATH, FILENAME)
 
         if not path.exists(filepath):
-            exception_msg = f"[Client._select_servers] File {FILENAME} at {FILE_DIRECTORY_PATH} does not exist"
-            CLIENT_LOGGER.exception(exception_msg)
+            error_msg = f"[Client._select_servers] File {FILENAME} at {FILE_DIRECTORY_PATH} does not exist"
+            CLIENT_LOGGER.error(error_msg)
             shutdown()
-            raise FileNotFoundError(exception_msg)
+            raise FileNotFoundError(error_msg)
 
         if path.getsize(filepath) == 0:
-            exception_msg = f"[Client._select_servers] File {FILENAME} at {FILE_DIRECTORY_PATH} is empty"
-            CLIENT_LOGGER.exception(exception_msg)
+            error_msg = f"[Client._select_servers] File {FILENAME} at {FILE_DIRECTORY_PATH} is empty"
+            CLIENT_LOGGER.error(error_msg)
             shutdown()
-            raise IOError(exception_msg)
+            raise IOError(error_msg)
 
         # Read file containing server addresses and their CPU
         with open(filepath, "r") as file:
@@ -326,6 +324,16 @@ def print_outcome(result: ndarray, check: ndarray) -> None:
         exit(1)
 
 if __name__ == "__main__":
+    # Logging
+    fileConfig(LOG_CONFIG_PATH, defaults = { "logfilename" : CLIENT_LOG, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
+
+    # Ensure 2nd matrix width is not smaller than number of vertical partitions
+    if MATRIX_2_WIDTH < VERTICAL_PARTITIONS:
+        error_msg = f"[Client.__main__] 2nd matrix's width ({MATRIX_2_WIDTH}) cannot be smaller than number of vertical partitions ({VERTICAL_PARTITIONS})"
+        CLIENT_LOGGER.error(error_msg)
+        shutdown()
+        raise ValueError(error_msg)
+    
     # Generate example matrices for testing
     matrix_a = generate_matrix(LENGTH, LENGTH)
     matrix_b = generate_matrix(LENGTH, MATRIX_2_WIDTH)

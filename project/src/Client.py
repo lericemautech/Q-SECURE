@@ -310,7 +310,6 @@ def print_outcome(result: ndarray, check: ndarray) -> None:
 if __name__ == "__main__":
     # Logging
     fileConfig(LOG_CONF_PATH, defaults = { "logfilename" : CLIENT_LOGFILE}, disable_existing_loggers = False)
-    CLIENT_LOGGER.info("\n==============================================\n")
     CLIENT_LOGGER.info("Client started")
     
     # Generate example matrices for testing

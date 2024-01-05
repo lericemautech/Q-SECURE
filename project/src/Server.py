@@ -26,17 +26,17 @@ class Server():
 
         # Check if directory_path exists
         if not path.exists(directory_path):
-            exception_msg = f"[Server.__init__] {directory_path} does not exist"
-            SERVER_LOGGER.exception(exception_msg)
+            error_msg = f"[Server.__init__] {directory_path} does not exist"
+            SERVER_LOGGER.error(error_msg)
             shutdown()
-            raise IOError(exception_msg)
+            raise IOError(error_msg)
 
         # Check if directory_path is actually a directory
         if not path.isdir(directory_path):
-            exception_msg = f"[Server.__init__] {directory_path} is not a directory"
-            SERVER_LOGGER.exception(exception_msg)
+            error_msg = f"[Server.__init__] {directory_path} is not a directory"
+            SERVER_LOGGER.error(error_msg)
             shutdown()
-            raise NotADirectoryError(exception_msg)
+            raise NotADirectoryError(error_msg)
 
         # Write Server's IP Address, port, number of cores, and OS to file in directory_path
         self._document_info(directory_path)

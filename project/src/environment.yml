@@ -1,7 +1,0 @@
-name: q-secure_env
-channels:
-  - defaults
-dependencies:
-  - python=3.12.0
-  - numpy
-  - pycryptodome

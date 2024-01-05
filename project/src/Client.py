@@ -156,6 +156,7 @@ class Client():
         if num_servers > len(addresses) or num_servers < 1:
             exception_msg = f"(Client._select_servers) {num_servers} is an invalid number of servers"
             CLIENT_LOGGER.exception(exception_msg)
+            shutdown()
             raise ValueError(exception_msg) from None
 
         filepath = path.join(DIRECTORY_PATH, FILENAME)

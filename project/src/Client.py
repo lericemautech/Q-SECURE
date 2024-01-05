@@ -129,7 +129,7 @@ class Client():
             exception_msg = f"(Client._handle_server) Invalid acknowledgment \"{ack_msg}\""
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
-            raise ValueError(exception_msg) from None
+            raise ValueError(exception_msg)
                             
         # Receive data from server
         return receive(server_socket)
@@ -157,7 +157,7 @@ class Client():
             exception_msg = f"(Client._select_servers) {num_servers} is an invalid number of servers"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
-            raise ValueError(exception_msg) from None
+            raise ValueError(exception_msg)
 
         filepath = path.join(DIRECTORY_PATH, FILENAME)
 
@@ -165,13 +165,13 @@ class Client():
             exception_msg = f"(Client._select_servers) File {FILENAME} at {DIRECTORY_PATH} does not exist"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
-            raise FileNotFoundError(exception_msg) from None
+            raise FileNotFoundError(exception_msg)
 
         if path.getsize(filepath) == 0:
             exception_msg = f"(Client._select_servers) File {FILENAME} at {DIRECTORY_PATH} is empty"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
-            raise IOError(exception_msg) from None
+            raise IOError(exception_msg)
 
         # Read file containing server addresses and their CPU
         with open(filepath, "r") as file:
@@ -262,41 +262,41 @@ class Client():
                     # Increment index
                     i += 1
 
-            except BrokenPipeError:
+            except BrokenPipeError as exception:
                 exception_msg = "(Client._work) Unable to write to shutdown socket"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
-                raise BrokenPipeError(exception_msg) from None
+                raise BrokenPipeError(exception_msg) from exception
 
-            except ConnectionRefusedError:
+            except ConnectionRefusedError as exception:
                 exception_msg = "(Client._work) Connection refused"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
-                raise ConnectionRefusedError(exception_msg) from None
+                raise ConnectionRefusedError(exception_msg) from exception
 
-            except ConnectionAbortedError:
+            except ConnectionAbortedError as exception:
                 exception_msg = "(Client._work) Connection aborted"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
-                raise ConnectionAbortedError(exception_msg) from None
+                raise ConnectionAbortedError(exception_msg) from exception
 
-            except ConnectionResetError:
+            except ConnectionResetError as exception:
                 exception_msg = "(Client._work) Connection reset"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
-                raise ConnectionResetError(exception_msg) from None
+                raise ConnectionResetError(exception_msg) from exception
 
-            except ConnectionError:
+            except ConnectionError as exception:
                 exception_msg = "(Client._work) Connection lost"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
-                raise ConnectionError(exception_msg) from None
+                raise ConnectionError(exception_msg) from exception
 
-            except TimeoutError:
+            except TimeoutError as exception:
                 exception_msg = "(Client._work) Connection timed out"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
-                raise TimeoutError(exception_msg) from None
+                raise TimeoutError(exception_msg) from exception
 
             except error as msg:
                 CLIENT_LOGGER.exception(f"(Client._work) {msg}")

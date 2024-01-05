@@ -29,14 +29,14 @@ class Server():
             exception_msg = f"{directory_path} does not exist"
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
-            raise IOError(exception_msg) from None
+            raise IOError(exception_msg)
 
         # Check if directory_path is actually a directory
         if not path.isdir(directory_path):
             exception_msg = f"{directory_path} is not a directory"
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
-            raise NotADirectoryError(exception_msg) from None
+            raise NotADirectoryError(exception_msg)
 
         # Write Server's IP Address, port, number of cores, and OS to file in directory_path
         self._document_info(directory_path)
@@ -208,41 +208,41 @@ class Server():
                     # multiply them, then send result and its position back to client)
                     self._handle_client(client_socket)
 
-        except BrokenPipeError:
+        except BrokenPipeError as exception:
             exception_msg = "(Server._start_server) Unable to write to shutdown socket"
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
-            raise BrokenPipeError(exception_msg) from None
+            raise BrokenPipeError(exception_msg) from exception
 
-        except ConnectionRefusedError:
+        except ConnectionRefusedError as exception:
             exception_msg = f"(Server._start_server) Connection refused"
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
-            raise ConnectionRefusedError(exception_msg) from None
+            raise ConnectionRefusedError(exception_msg) from exception
         
-        except ConnectionAbortedError:
+        except ConnectionAbortedError as exception:
             exception_msg = "(Server._start_server) Connection aborted"
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
-            raise ConnectionAbortedError(exception_msg) from None
+            raise ConnectionAbortedError(exception_msg) from exception
 
-        except ConnectionResetError:
+        except ConnectionResetError as exception:
             exception_msg = "(Server._start_server) Connection reset"
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
-            raise ConnectionResetError(exception_msg) from None
+            raise ConnectionResetError(exception_msg) from exception
     
-        except ConnectionError:
+        except ConnectionError as exception:
             exception_msg = f"(Server._start_server) Connection lost"
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
-            raise ConnectionError(exception_msg) from None
+            raise ConnectionError(exception_msg) from exception
 
-        except TimeoutError:
+        except TimeoutError as exception:
             exception_msg = "(Server._start_server) Connection timed out"
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
-            raise TimeoutError(exception_msg) from None
+            raise TimeoutError(exception_msg) from exception
 
         except KeyboardInterrupt:
             msg = f"Server at {self._server_address} disconnected"
@@ -251,8 +251,8 @@ class Server():
             shutdown()
             exit(0)
 
-        except error as msg:
-            exception_msg = f"(Server._start_server) {msg}"
+        except error as exception:
+            exception_msg = f"(Server._start_server) {exception}"
             SERVER_LOGGER.exception(exception_msg)
             print(f"EXCEPTION: {exception_msg}")
             shutdown()

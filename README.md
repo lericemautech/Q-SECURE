@@ -5,9 +5,9 @@
 ![](https://img.shields.io/static/v1?label=IDE&style=flat&message=Visual+Studio+Code&logo=visual+studio+code&color=007acc&labelColor=393939&logoColor=007acc)
 
 ## Requirements
-- [x] Python 3.12.0
-- [x] NumPy
-- [x] Git
+- [x] [Python 3.12.0](https://www.python.org/downloads)
+- [x] [NumPy](https://numpy.org/install)
+- [x] [Git](https://git-scm.com/downloads)
 
 ## Usage
 1. Enter the the directory where you want the repository (`Q-SECURE`) to be cloned

@@ -12,8 +12,8 @@ BUFFER = 4096
 HEADERSIZE = 10
 FILE_DIRECTORY_PATH = path.join(getcwd(), "project", "file")
 FILENAME = "server_info.txt"
-LOG_CONFIG_NAME = "log.conf"
-LOG_CONFIG_PATH = path.join(FILE_DIRECTORY_PATH, "logging", LOG_CONFIG_NAME)
+LOG_CONFIG = "log.conf"
+LOG_CONFIG_PATH = path.join(FILE_DIRECTORY_PATH, "logging", LOG_CONFIG)
 
 class Address(NamedTuple):
     """

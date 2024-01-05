@@ -126,7 +126,7 @@ class Client():
         ack_msg_length = int(ack_data.decode("utf-8").strip())
         ack_msg = server_socket.recv(ack_msg_length).decode("utf-8").strip()
         if ack_msg != "ACK":
-            exception_msg = f"(Client._handle_server) Invalid acknowledgment \"{ack_msg}\""
+            exception_msg = f"[Client._handle_server] Invalid acknowledgment \"{ack_msg}\""
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise ValueError(exception_msg)
@@ -154,7 +154,7 @@ class Client():
         selected_servers = { }
         
         if num_servers > len(addresses) or num_servers < 1:
-            exception_msg = f"(Client._select_servers) {num_servers} is an invalid number of servers"
+            exception_msg = f"[Client._select_servers] {num_servers} is an invalid number of servers"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise ValueError(exception_msg)
@@ -162,13 +162,13 @@ class Client():
         filepath = path.join(DIRECTORY_PATH, FILENAME)
 
         if not path.exists(filepath):
-            exception_msg = f"(Client._select_servers) File {FILENAME} at {DIRECTORY_PATH} does not exist"
+            exception_msg = f"[Client._select_servers] File {FILENAME} at {DIRECTORY_PATH} does not exist"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise FileNotFoundError(exception_msg)
 
         if path.getsize(filepath) == 0:
-            exception_msg = f"(Client._select_servers) File {FILENAME} at {DIRECTORY_PATH} is empty"
+            exception_msg = f"[Client._select_servers] File {FILENAME} at {DIRECTORY_PATH} is empty"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise IOError(exception_msg)
@@ -263,43 +263,43 @@ class Client():
                     i += 1
 
             except BrokenPipeError as exception:
-                exception_msg = "(Client._work) Unable to write to shutdown socket"
+                exception_msg = "[Client._work] Unable to write to shutdown socket"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
                 raise BrokenPipeError(exception_msg) from exception
 
             except ConnectionRefusedError as exception:
-                exception_msg = "(Client._work) Connection refused"
+                exception_msg = "[Client._work] Connection refused"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
                 raise ConnectionRefusedError(exception_msg) from exception
 
             except ConnectionAbortedError as exception:
-                exception_msg = "(Client._work) Connection aborted"
+                exception_msg = "[Client._work] Connection aborted"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
                 raise ConnectionAbortedError(exception_msg) from exception
 
             except ConnectionResetError as exception:
-                exception_msg = "(Client._work) Connection reset"
+                exception_msg = "[Client._work] Connection reset"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
                 raise ConnectionResetError(exception_msg) from exception
 
             except ConnectionError as exception:
-                exception_msg = "(Client._work) Connection lost"
+                exception_msg = "[Client._work] Connection lost"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
                 raise ConnectionError(exception_msg) from exception
 
             except TimeoutError as exception:
-                exception_msg = "(Client._work) Connection timed out"
+                exception_msg = "[Client._work] Connection timed out"
                 CLIENT_LOGGER.exception(exception_msg)
                 shutdown()
                 raise TimeoutError(exception_msg) from exception
 
             except error as msg:
-                CLIENT_LOGGER.exception(f"(Client._work) {msg}")
+                CLIENT_LOGGER.exception(f"[Client._work] {msg}")
                 shutdown()
                 exit(1)
 

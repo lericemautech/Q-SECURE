@@ -1,102 +1,105 @@
-from socket import socket, error, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
+from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
-from numpy import ndarray, dot, empty, sum, concatenate
+from numpy import ndarray, dot
 from typing import NamedTuple
-from os import cpu_count, path, rename
-from platform import platform
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from os import path, rename, cpu_count
 from logging import getLogger, shutdown
-from logging.config import fileConfig
+from threading import Thread
 from time import perf_counter
-from project.src.Shared import Address, timing, receive, send, partition, FILE_DIRECTORY_PATH, FILENAME, VERTICAL_PARTITIONS, LOG_CONFIG_PATH
+from psutil import virtual_memory
+from platform import platform
+from project.src.ExceptionHandler import handle_exceptions
+from project.src.Shared import Address, create_logger, timing, receive, send, FILEPATH, TEMP_FILEPATH, FILE_DIRECTORY_PATH
 
 # TODO Fix logging for server(s)
 # https://docs.python.org/2/howto/logging-cookbook.html#sending-and-receiving-logging-events-across-a-network
 
-SERVER_LOG = "server.log"
 SERVER_LOGGER = getLogger(__name__)
 
 class Matrix(NamedTuple):
     matrix: ndarray
     index: int
 
+# TODO Finish writing this class
+class ClientThread(Thread):
+    def __init__(self, address: Address):
+        Thread.__init__(self)
+        self.address = address
+        SERVER_LOGGER.info(f"[+] New thread started for {address}\n")
+
+    def run(self):
+        while True:
+            # data = recv(BUFFER)
+            # if not data: break
+            print("received data:")
+            # conn.send(b"<Server> Got your data. Send some more\n")
+
 class Server():
     def __init__(self, address: Address, directory_path: str = FILE_DIRECTORY_PATH):
-        if not all(address):
-            error_msg = f"{address} does not have a valid IP Address and/or port"
-            SERVER_LOGGER.error(error_msg)
-            shutdown()
-            raise ValueError(error_msg)
-
         # Logging
-        fileConfig(LOG_CONFIG_PATH, defaults = { "logfilename" : SERVER_LOG, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
+        create_logger("server.log")
+        SERVER_LOGGER.info("Starting Server...\n")
         
+        # Check if address is valid (i.e. has IP Address and port)
+        if not all(address):
+            exception_msg = f"{address} does not have a valid IP Address and/or port"
+            SERVER_LOGGER.exception(exception_msg)
+            shutdown()
+            raise ValueError(exception_msg)
+
         # Server's IP Address and port
         self._server_address = address
 
         # Check if directory_path exists
         if not path.exists(directory_path):
-            error_msg = f"{directory_path} does not exist"
-            SERVER_LOGGER.error(error_msg)
+            exception_msg = f"{directory_path} does not exist"
+            SERVER_LOGGER.exception(exception_msg)
             shutdown()
-            raise IOError(error_msg)
+            raise IOError(exception_msg)
 
         # Check if directory_path is actually a directory
         if not path.isdir(directory_path):
-            error_msg = f"{directory_path} is not a directory"
-            SERVER_LOGGER.error(error_msg)
+            exception_msg = f"{directory_path} is not a directory"
+            SERVER_LOGGER.exception(exception_msg)
             shutdown()
-            raise NotADirectoryError(error_msg)
+            raise NotADirectoryError(exception_msg)
+        
+        # Write Server's IP Address, port, number of cores, and OS to FILEPATH
+        self._document_info()
 
-        # Write Server's IP Address, port, number of cores, and OS to file in directory_path
-        self._document_info(directory_path)
-    
-    def _document_info(self, directory_path: str = FILE_DIRECTORY_PATH, filename: str = FILENAME, remove_duplicates: bool = False) -> None:
+    def _document_info(self) -> None:
         """
-        Document server's IP Address, port, number of cores, and OS to FILENAME at directory_path
-
-        Args:
-            directory_path (str, optional): Path of the directory to write the file to; defaults to FILE_DIRECTORY_PATH
-            filename (str, optional): Name of the file to write to; defaults to FILENAME
-            remove_duplicates (bool, optional): Whether to remove entries with the same IP address
-            and port as current Server; defaults to False
+        Document server's IP Address, port, number of cores, and OS to FILEPATH
         """
         # Get current Server's IP Address and port
         ip, port = self._server_address.ip, self._server_address.port
 
-        # Path of file to write to
-        filepath = path.join(directory_path, filename)
-
         # Removes entries with the same IP Address and port as current Server
-        if remove_duplicates and path.isfile(filepath):
-            if path.getsize(filepath) > 0:
-                # Path of temporary file to write to
-                temp_filepath = path.join(directory_path, f"temp_{filename}")
+        if path.isfile(FILEPATH) and path.getsize(FILEPATH) > 0:
+            # Read from original filepath and write to temporary filepath
+            with open(FILEPATH, "r") as in_file, open(TEMP_FILEPATH, "w") as out_file:
+                for line in in_file:
+                    # Split line into list (i.e. [IP Address, port, number of cores, OS])
+                    server_info = line.split(" ")
 
-                # Read from original filepath and write to temporary filepath
-                with open(filepath, "r") as in_file, open(temp_filepath, "w+") as out_file:
-                    for line in in_file:
-                        # Split line into list (i.e. [IP Address, port, number of cores, OS])
-                        server_info = line.split(" ")
+                    # Make sure line is valid (i.e. has at least IP Address and port)
+                    if len(server_info) < 2:
+                        SERVER_LOGGER.error(f"Invalid line: {line}\n")
+                        continue
+                    
+                    # Get IP Address and port at current line
+                    curr_ip, curr_port = server_info[:2]
 
-                        # Make sure line is valid (i.e. has at least IP Address and port)
-                        if len(server_info) < 2:
-                            SERVER_LOGGER.error(f"Invalid line: {line}\n")
-                            continue
-                        
-                        # Get IP Address and port at current line
-                        curr_ip, curr_port = server_info[:2]
+                    # Write line to temp_server_info.txt if IP Address and port != current Server
+                    if curr_ip != ip or int(curr_port) != port:
+                        out_file.write(line)
+                    
+            # Rename temporary filepath to original filepath
+            rename(TEMP_FILEPATH, FILEPATH)
 
-                        # Write line to temp_server_info.txt if IP Address and port are not the same as current Server
-                        if curr_ip != ip and curr_port != port:
-                            out_file.write(line)
-
-                # Rename temporary filepath to original filepath
-                rename(temp_filepath, filepath)
-
-        # Append (i.e. write at end) Server's IP Address, port, number of cores, and OS to file
-        with open(filepath, "a") as file:
-            file.write(f"{ip} {port} {cpu_count()} {platform(terse = True)}\n")
+        # Create file and write Server's IP Address, port, number of cores, available RAM, and OS to file
+        with open(FILEPATH, "a") as file:
+            file.write(f"{ip} {port} {cpu_count()} {virtual_memory().available / 1000000000:.2f} {platform(terse = True)}\n")
 
     def _multiply(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> Matrix:
         """
@@ -115,35 +118,6 @@ class Server():
         end = perf_counter()
         SERVER_LOGGER.info(f"Multiplied matrices in {timing(end, start)} seconds\n")
         return product
-
-        # TODO Threading ONLY for very large matrices (i.e. LENGTH > 10000?)
-        matrix_a_partitions, matrix_b_partitions = partition(matrix_a, matrix_b, SERVER_LOGGER)
-        threads, results, num = [ ], empty(len(matrix_a_partitions), dtype = ndarray), 0
-
-        # Use threads to multiply partitioned matrices
-        with ThreadPoolExecutor() as executor:
-            for i in range(len(matrix_a_partitions)):
-                threads.append(executor.submit(lambda m1, m2, i: Matrix(dot(m1, m2), i), matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS], num))
-
-                # Keep track of position
-                num += 1
-
-            # Get completed thread's result and store in proper order
-            for thread in as_completed(threads):
-                result, num = thread.result()
-                results[num] = result
-
-        # TODO Rewrite this into method in Shared.py
-        # Number of columns, end index, and list for storing combined results
-        end, combined_results =  0, []
-
-        # Sum all values in the same row, then add to combined_results
-        for i in range(0, len(results), VERTICAL_PARTITIONS):
-            end += VERTICAL_PARTITIONS
-            combined_results.append(sum(results[i:end]))
-
-        # Combine all results into a single matrix and return
-        return Matrix(concatenate(combined_results), index)
         
     def _send_client(self, client_socket: socket, data: bytes) -> None:
         """
@@ -166,11 +140,13 @@ class Server():
         Args:
             client_socket (socket): Client socket
         """
+        # Start timer
         start = perf_counter()
         
         # Receive data from client
         data = receive(client_socket)
 
+        # TODO Try-except for loads(data)
         # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
         matrix_a_partition, matrix_b_partition, index = loads(data)
         print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
@@ -180,28 +156,26 @@ class Server():
         
         # Convert result to bytes, then send back to client
         self._send_client(client_socket, dumps(result))
-
-        end = perf_counter()
-        SERVER_LOGGER.info(f"Handled client in {timing(end, start)} seconds\n")
         print(f"\nSent: {result}\n")
 
+        # End timer
+        end = perf_counter()
+
+        # Log method's speed
+        SERVER_LOGGER.info(f"Handled client in {timing(end, start)} second(s)\n")
+
+    @handle_exceptions(SERVER_LOGGER)
     def start_server(self) -> None:
         """
         Start server and listen for connections
 
         Raises:
-            BrokenPipeError: Unable to write to shutdown socket
-            ConnectionRefusedError: Connection refused
-            ConnectionAbortedError: Connection aborted
-            ConnectionResetError: Connection reset
-            ConnectionError: Connection lost
-            TimeoutError: Connection timed out
             KeyboardInterrupt: Server disconnected due to keyboard (i.e. CTRL + C)
         """
         start = perf_counter()
         
         try:
-            with socket(AF_INET, SOCK_STREAM) as server_socket:
+            with socket(AF_INET, SOCK_STREAM) as server_socket:                
                 # Allow reuse of address
                 server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
@@ -214,75 +188,25 @@ class Server():
                 SERVER_LOGGER.info(f"{listen_msg}\n")
                 print(listen_msg)
 
+                threads = [ ]
+
                 while True:
                     # Accept connection from client
                     client_socket, client_address = server_socket.accept()
                     SERVER_LOGGER.info(f"Accepted connection from {client_address}\n")
 
+                    # Create new thread
+                    new_thread = ClientThread(client_address)
+
                     # Handle client (i.e. get position and partitions of Matrix A and Matrix B,
                     # multiply them, then send result and its position back to client)
                     self._handle_client(client_socket)
 
-        except BrokenPipeError as exception:
-            exception_msg = "Unable to write to shutdown socket"
-            SERVER_LOGGER.exception(exception_msg)
-            end = perf_counter()
-            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
-            shutdown()
-            raise BrokenPipeError(exception_msg) from exception
-
-        except ConnectionRefusedError as exception:
-            exception_msg = f"Connection refused"
-            SERVER_LOGGER.exception(exception_msg)
-            end = perf_counter()
-            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
-            shutdown()
-            raise ConnectionRefusedError(exception_msg) from exception
-        
-        except ConnectionAbortedError as exception:
-            exception_msg = "Connection aborted"
-            SERVER_LOGGER.exception(exception_msg)
-            end = perf_counter()
-            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
-            shutdown()
-            raise ConnectionAbortedError(exception_msg) from exception
-
-        except ConnectionResetError as exception:
-            exception_msg = "Connection reset"
-            SERVER_LOGGER.exception(exception_msg)
-            end = perf_counter()
-            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
-            shutdown()
-            raise ConnectionResetError(exception_msg) from exception
-    
-        except ConnectionError as exception:
-            exception_msg = f"Connection lost"
-            SERVER_LOGGER.exception(exception_msg)
-            end = perf_counter()
-            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
-            shutdown()
-            raise ConnectionError(exception_msg) from exception
-
-        except TimeoutError as exception:
-            exception_msg = "Connection timed out"
-            SERVER_LOGGER.exception(exception_msg)
-            end = perf_counter()
-            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
-            shutdown()
-            raise TimeoutError(exception_msg) from exception
-
         except KeyboardInterrupt:
-            msg = f"Server at {self._server_address} disconnected"
-            SERVER_LOGGER.info(f"{msg}\n")
-            print(f"\n{msg}")
-            end = perf_counter()
-            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
-            shutdown()
+            print(f"\nServer at {self._server_address} disconnected")
             exit(0)
 
-        except error as exception:
-            SERVER_LOGGER.exception(exception)
+        finally:
             end = perf_counter()
             SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
             shutdown()
-            raise error(exception) from exception

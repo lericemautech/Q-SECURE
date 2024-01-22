@@ -12,8 +12,8 @@ from project.src.Shared import Address, HORIZONTAL_PARTITIONS, FILEPATH, create_
 MATRIX_2_WIDTH = 2
 CLIENT_LOGGER = getLogger(__name__)
 # TODO Relocate ADDRESSES to separate file for improved security and editing
-ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
-#ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
+#ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
+ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
 
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[Address] = ADDRESSES):
@@ -185,7 +185,7 @@ class Client():
             
         Returns:
             list[Address]: List of server addresses to send jobs to
-        """        
+        """
         if self._num_servers > len(addresses) or self._num_servers < 1:
             exception_msg = f"{self._num_servers} is an invalid number of servers"
             CLIENT_LOGGER.exception(exception_msg)

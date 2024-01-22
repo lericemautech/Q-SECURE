@@ -2,7 +2,8 @@ from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
 from numpy import ndarray, dot
 from typing import NamedTuple
-from os import path, rename, cpu_count
+from os import path, rename, cpu_count, umask, O_RDONLY, O_CREAT, O_WRONLY
+from os import open as opener
 from logging import getLogger, shutdown
 from threading import Thread
 from time import perf_counter
@@ -74,10 +75,15 @@ class Server():
         # Get current Server's IP Address and port
         ip, port = self._server_address.ip, self._server_address.port
 
+        umask(0)
+
+        descriptor = opener(FILEPATH, flags = O_RDONLY, mode = 0o777)
+        temp_descriptor = opener(TEMP_FILEPATH, flags = O_CREAT | O_WRONLY, mode = 0o777)
+
         # Removes entries with the same IP Address and port as current Server
         if path.isfile(FILEPATH) and path.getsize(FILEPATH) > 0:
             # Read from original filepath and write to temporary filepath
-            with open(FILEPATH, "r") as in_file, open(TEMP_FILEPATH, "w") as out_file:
+            with open(descriptor, "r") as in_file, open(temp_descriptor, "w") as out_file:
                 for line in in_file:
                     # Split line into list (i.e. [IP Address, port, number of cores, OS])
                     server_info = line.split(" ")

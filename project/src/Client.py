@@ -6,14 +6,15 @@ from os import path
 from random import sample
 from time import perf_counter
 from logging import getLogger, shutdown
+from ipaddress import ip_address
 from project.src.ExceptionHandler import handle_exceptions
 from project.src.Shared import Address, HORIZONTAL_PARTITIONS, FILEPATH, create_logger, receive, send, generate_matrix, timing, HEADERSIZE, LENGTH, VERTICAL_PARTITIONS
 
 MATRIX_2_WIDTH = 2
 CLIENT_LOGGER = getLogger(__name__)
 # TODO Relocate ADDRESSES to separate file for improved security and editing
-#ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
-ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
+ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
+#ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
 
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[Address] = ADDRESSES):
@@ -222,13 +223,41 @@ class Client():
         if len(set(server_cpu.values())) == 1:
             # Check if all selected servers with same CPU have the same available RAM
             if len(set(server_ram.values())) == 1:
+                # TODO Verify these servers?
                 return sample(list(server_ram.keys()), self._num_servers)
 
             # Otherwise, return the top servers (i.e. servers with most available RAM)
-            return sorted(server_ram, reverse = True)[:self._num_servers]
+            return self._verify_addresses(sorted(server_ram, reverse = True))
 
         # Otherwise, return the top servers (i.e. servers with highest CPU power)
-        return sorted(server_cpu, reverse = True)[:self._num_servers]                
+        return self._verify_addresses(sorted(server_cpu, reverse = True))
+
+    def _verify_addresses(self, addresses: list[Address]) -> list[Address]:
+        """
+        Get subset of servers that are online AND computationally powerful
+
+        Args:
+            addresses (list[Address]): List of server addresses
+
+        Returns:
+            list[Address]: Subset of addresses to send jobs to
+        """
+        valid_servers = [ ]
+
+        for address in addresses:
+            try:
+                ip_address(address.ip)
+                CLIENT_LOGGER.info(f"Server at {address} is online\n")
+                valid_servers.append(address)
+                
+                if len(valid_servers) == self._num_servers:
+                    break
+
+            except ValueError:
+                CLIENT_LOGGER.exception(f"Server at {address} is not online\n")
+                continue                
+                
+        return valid_servers
 
     @handle_exceptions(CLIENT_LOGGER)
     def _work(self) -> None:

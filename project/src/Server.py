@@ -2,15 +2,16 @@ from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
 from numpy import ndarray, dot
 from typing import NamedTuple
-from os import path, rename, cpu_count, umask, O_RDONLY, O_CREAT, O_WRONLY
+from os import O_WRONLY, path, cpu_count, umask, O_CREAT
 from os import open as opener
 from logging import getLogger, shutdown
 from threading import Thread
 from time import perf_counter
 from psutil import virtual_memory
 from platform import platform
+from datetime import datetime
 from project.src.ExceptionHandler import handle_exceptions
-from project.src.Shared import Address, create_logger, timing, receive, send, FILEPATH, TEMP_FILEPATH, FILE_DIRECTORY_PATH
+from project.src.Shared import Address, create_logger, timing, receive, send, FILEPATH, FILE_DIRECTORY_PATH
 
 # TODO Fix logging for server(s)
 # https://docs.python.org/2/howto/logging-cookbook.html#sending-and-receiving-logging-events-across-a-network
@@ -65,9 +66,11 @@ class Server():
             shutdown()
             raise NotADirectoryError(exception_msg)
         
-        # Write Server's IP Address, port, number of cores, and OS to FILEPATH
+        # Write Server's IP Address, port, number of cores, available RAM, OS, and timestamp to FILEPATH
         self._document_info()
 
+# TODO Filesize threshold ~1GB
+# TODO After x lines, create new file. After creating N files, delete N - 1 files.
     def _document_info(self) -> None:
         """
         Document server's IP Address, port, number of cores, and OS to FILEPATH
@@ -76,36 +79,11 @@ class Server():
         ip, port = self._server_address.ip, self._server_address.port
 
         umask(0)
-
-        descriptor = opener(FILEPATH, flags = O_RDONLY, mode = 0o777)
-        temp_descriptor = opener(TEMP_FILEPATH, flags = O_CREAT | O_WRONLY, mode = 0o777)
-
-        # Removes entries with the same IP Address and port as current Server
-        if path.isfile(FILEPATH) and path.getsize(FILEPATH) > 0:
-            # Read from original filepath and write to temporary filepath
-            with open(descriptor, "r") as in_file, open(temp_descriptor, "w") as out_file:
-                for line in in_file:
-                    # Split line into list (i.e. [IP Address, port, number of cores, OS])
-                    server_info = line.split(" ")
-
-                    # Make sure line is valid (i.e. has at least IP Address and port)
-                    if len(server_info) < 2:
-                        SERVER_LOGGER.error(f"Invalid line: {line}\n")
-                        continue
-                    
-                    # Get IP Address and port at current line
-                    curr_ip, curr_port = server_info[:2]
-
-                    # Write line to temp_server_info.txt if IP Address and port != current Server
-                    if curr_ip != ip or int(curr_port) != port:
-                        out_file.write(line)
-                    
-            # Rename temporary filepath to original filepath
-            rename(TEMP_FILEPATH, FILEPATH)
-
-        # Create file and write Server's IP Address, port, number of cores, available RAM, and OS to file
-        with open(FILEPATH, "a") as file:
-            file.write(f"{ip} {port} {cpu_count()} {virtual_memory().available / 1000000000:.2f} {platform(terse = True)}\n")
+        descriptor = opener(FILEPATH, flags = O_CREAT | O_WRONLY, mode = 0o777)
+        
+        # Create file and write Server's IP Address, port, number of cores, available RAM, OS, and timestamp to file
+        with open(descriptor, "a") as file:
+            file.write(f"{ip} {port} {cpu_count()} {virtual_memory().available / 1000000000:.2f} {platform(terse = True)} {datetime.now()}\n")
 
     def _multiply(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> Matrix:
         """

@@ -8,12 +8,46 @@
 </div>
 
 ## Requirements
-- [x] [Python 3.12.0](https://www.python.org/downloads)
-- [x] [NumPy](https://numpy.org/install)
-- [x] [Git](https://git-scm.com/downloads)
+- [x] [Anaconda](https://docs.continuum.io/free/anaconda/install) **OR** [Miniconda](https://docs.conda.io/projects/miniconda/en/latest)
+> [!NOTE]
+> If you have trouble deciding between Anaconda and Miniconda, please refer to the table below
+> <table>
+> <thead>
+> <tr>
+> <th><center>Anaconda</center></th>
+> <th><center>Miniconda</center></th>
+> </tr>
+> </thead>
+> <tbody>
+> <tr>
+> <td>New to conda and/or Python</td>
+> <td>Familiar with conda and/or Python</td>
+> </tr>
+> <tr>
+> <td>Like the convenience of having Python and 1,500+ scientific packages automatically installed at once</td>
+> <td>Want fast access to Python and the conda commands and plan to sort out the other programs later</td>
+> </tr>
+> <tr>
+> <td>Have the time and space (a few minutes and 3 GB)</td>
+> <td>Don't have the time or space to install 1,500+ packages</td>
+> </tr>
+> <tr>
+> <td>Don't want to individually install each package</td>
+> <td>Don't mind individually installing each package</td>
+> </tr>
+> </tbody>
+> </table>
 
 ## Usage
-1. Enter the the directory where you want the repository (`Q-SECURE`) to be cloned
+1. Verify that conda is installed
+   ```
+   conda --version
+   ```
+2. Ensure conda is up to date
+   ```
+   conda update conda
+   ```
+3. Enter the the directory where you want the repository (`Q-SECURE`) to be cloned
     * UNIX
         ```
         cd ~/path/to/directory
@@ -22,11 +56,32 @@
         ```
         cd C:\path\to\directory
         ```
-2. Clone the repository, then enter its directory
+4. Clone the repository, then enter its directory
     ```
     git clone https://github.com/lericemautech/Q-SECURE.git && cd Q-SECURE
     ```
-3. Run the 1st server:
+5. Create a conda virtual environment from `environment.yml`
+   ```
+   conda env create -f environment.yml
+   ```
+6. Activate the virtual environment (`q-secure_env`)
+   ```
+   conda activate q-secure_env
+   ```
+7. Confirm that the virtual environment (`q-secure_env`) is active
+     * If active, the virtual environment's name should be in parentheses () or brackets [] before your command prompt, e.g.
+       ```
+       (q-secure_env) $
+       ```
+     * If necessary, see which environments are available and/or currently active (active environment denoted with asterisk (*))
+       ```
+       conda info --envs
+       ```
+       **OR**
+       ```
+       conda env list
+       ```
+8. Run the 1st server within `Q-SECURE` directory
     * UNIX
         ```
         $(which python) -m project.test.TestServer1
@@ -35,7 +90,7 @@
         ```
         $(where python) -m project.test.TestServer1
         ```
-4. Run the 2nd server:
+9. Run the 2nd server within `Q-SECURE` directory
     * UNIX
         ```
         $(which python) -m project.test.TestServer2
@@ -44,7 +99,7 @@
         ```
         $(where python) -m project.test.TestServer2
         ```
-5. Run the 3rd server:
+10. Run the 3rd server within `Q-SECURE` directory
     * UNIX
         ```
         $(which python) -m project.test.TestServer3
@@ -53,7 +108,7 @@
         ```
         $(where python) -m project.test.TestServer3
         ```
-6. Run the client
+11. Run the client within `Q-SECURE` directory
     * UNIX
         ```
         $(which python) -m project.src.Client
@@ -62,4 +117,4 @@
         ```
         $(where python) -m project.src.Client
         ```
-7. Press `CTRL + C` in the terminal running each server to disconnect
+12. Press `CTRL + C` in the terminal running each server to disconnect

@@ -38,6 +38,7 @@ class Client():
 
         # Server(s) to send jobs to        
         self._server_addresses: list[Address] = self._select_servers(addresses)
+        CLIENT_LOGGER.info(f"Sending jobs to {self._server_addresses}\n")
 
         # Create and queue partitions of Matrix A and Matrix B and their position, to be sent to selected server(s)
         self._partitions: Queue = self._queue_partitions(matrix_a, matrix_b)
@@ -183,7 +184,7 @@ class Client():
         Read file in reverse
 
         Args:
-            filepath (str, optional): Path of file to read from. Defaults to FILEPATH.
+            filepath (str, optional): Path of file to read from; defaults to FILEPATH
 
         Yields:
             Iterator[str]: Line(s) in file at filepath
@@ -242,6 +243,7 @@ class Client():
             raise IOError(exception_msg)
 
         valid_servers = { }
+        start = perf_counter()
         
         # Read file containing server addresses, their CPU, and available RAM in reverse (i.e., most recent information first)
         for line in self._read_file_reverse():
@@ -255,24 +257,22 @@ class Client():
                 CLIENT_LOGGER.info(f"Adding info from {line} to valid_servers\n")
                 valid_servers[curr_address] = (int(curr_cpu), float(curr_ram))
 
+        end_read = perf_counter()
+        CLIENT_LOGGER.info(f"Read file in {timing(end_read, start)} seconds\n")
+        
         # Check if all valid servers have the same CPU, same available RAM
         same_cpu, same_ram = self._same_cpu_ram(valid_servers)
-
-        servers_list = [ ]
         
         if same_cpu:
             if same_ram:
                 # Return random sample of valid servers since they have same CPU and available RAM
-                servers_list = sample(list(valid_servers.keys()), self._num_servers)
+                return sample(list(valid_servers.keys()), self._num_servers)
 
             # Return top valid servers with most available RAM
-            else: servers_list = sorted(valid_servers.keys(), key = lambda x: valid_servers[x][1], reverse = True)[:self._num_servers]
+            else: return sorted(valid_servers.keys(), key = lambda x: valid_servers[x][1], reverse = True)[:self._num_servers]
             
         # Return top valid servers with highest CPU power
-        else: servers_list = sorted(valid_servers.keys(), key = lambda x: valid_servers[x], reverse = True)[:self._num_servers]
-
-        CLIENT_LOGGER.info(f"Sending jobs to {servers_list}\n")
-        return servers_list
+        else: return sorted(valid_servers.keys(), key = lambda x: valid_servers[x], reverse = True)[:self._num_servers]
 
     def _same_cpu_ram(self, servers: dict[Address, tuple[int, float]]) -> tuple[bool, bool]:
         """
@@ -284,6 +284,7 @@ class Client():
         Returns:
             tuple[bool, bool]: Whether or not servers have same CPU, same available RAM
         """
+        start = perf_counter()
         same_cpu, same_ram, cpu, ram = True, True, [ ], [ ]
         
         for c, r in servers.values():
@@ -300,6 +301,9 @@ class Client():
                 same_ram = False
                 break
 
+        end = perf_counter()
+        CLIENT_LOGGER.info(f"Checked if servers have same CPU and available RAM in {timing(end, start)} seconds\n")
+        
         return same_cpu, same_ram
 
     def _is_valid(self, address: Address) -> bool:

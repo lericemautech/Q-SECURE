@@ -73,7 +73,7 @@ class Server():
 # TODO After x lines, create new file. After creating N files, delete N - 1 files.
     def _document_info(self) -> None:
         """
-        Document server's IP Address, port, number of cores, and OS to FILEPATH
+        Document server's IP Address, port, number of cores, available RAM, OS, and timestamp to FILEPATH
         """
         # Get current Server's IP Address and port
         ip, port = self._server_address.ip, self._server_address.port
@@ -123,17 +123,28 @@ class Server():
 
         Args:
             client_socket (socket): Client socket
+
+        Raises:
+            EOFError: Client is checking if server is listening
         """
         # Start timer
         start = perf_counter()
         
         # Receive data from client
         data = receive(client_socket)
+        
+        try:
+            # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
+            matrix_a_partition, matrix_b_partition, index = loads(data)
+            print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
 
-        # TODO Try-except for loads(data)
-        # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
-        matrix_a_partition, matrix_b_partition, index = loads(data)
-        print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
+        except EOFError:
+            SERVER_LOGGER.info("Client is checking if server is listening\n")
+            return
+
+        except:
+            SERVER_LOGGER.exception("Unexpected error occurred\n")
+            return
 
         # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
         result = self._multiply(matrix_a_partition, matrix_b_partition, index)
@@ -172,15 +183,10 @@ class Server():
                 SERVER_LOGGER.info(f"{listen_msg}\n")
                 print(listen_msg)
 
-                threads = [ ]
-
                 while True:
                     # Accept connection from client
                     client_socket, client_address = server_socket.accept()
-                    SERVER_LOGGER.info(f"Accepted connection from {client_address}\n")
-
-                    # Create new thread
-                    new_thread = ClientThread(client_address)
+                    SERVER_LOGGER.info(f"Server at {self._server_address} accepted connection from {client_address}\n")
 
                     # Handle client (i.e. get position and partitions of Matrix A and Matrix B,
                     # multiply them, then send result and its position back to client)

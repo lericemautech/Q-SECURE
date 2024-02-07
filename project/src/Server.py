@@ -84,6 +84,7 @@ class Server():
         # Create file and write Server's IP Address, port, number of cores, available RAM, OS, and timestamp to file
         with open(descriptor, "a") as file:
             file.write(f"{ip} {port} {cpu_count()} {virtual_memory().available / 1000000000:.2f} {platform(terse = True)} {datetime.now()}\n")
+            SERVER_LOGGER.info(f"Recorded information and timestamp for server at {self._server_address}\n")
 
     def _multiply(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> Matrix:
         """
@@ -113,9 +114,12 @@ class Server():
         """
         # Add header to and send acknowledgment packet
         send(client_socket, "ACK".encode("utf-8"))
+        SERVER_LOGGER.info(f"Server at {self._server_address} sent acknowledgement to client {client_socket}\n")
         
         # Add header to and send message packet back to client
         send(client_socket, data)
+        SERVER_LOGGER.info(f"Server at {self._server_address} sent message packet back to client {client_socket}\n")
+
 
     def _handle_client(self, client_socket: socket) -> None:
         """
@@ -139,11 +143,11 @@ class Server():
             print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
 
         except EOFError:
-            SERVER_LOGGER.info("Client is checking if server is listening\n")
+            SERVER_LOGGER.info(f"Client {client_socket} is checking if server at {self._server_address} is listening\n")
             return
 
         except:
-            SERVER_LOGGER.exception("Unexpected error occurred\n")
+            SERVER_LOGGER.exception(f"Unexpected error occurred... server at {self._server_address} will stop handling client {client_socket}\n")
             return
 
         # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
@@ -157,7 +161,7 @@ class Server():
         end = perf_counter()
 
         # Log method's speed
-        SERVER_LOGGER.info(f"Handled client in {timing(end, start)} second(s)\n")
+        SERVER_LOGGER.info(f"Successfully handled client in {timing(end, start)} second(s)\n")
 
     @handle_exceptions(SERVER_LOGGER)
     def start_server(self) -> None:

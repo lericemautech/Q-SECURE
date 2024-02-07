@@ -1,12 +1,12 @@
+from collections.abc import Iterator
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
 from numpy import ndarray, random, array_split, concatenate, dot, shape, array_equal
 from queue import Queue
-from os import path
+from os import path, SEEK_END
 from random import sample
 from time import perf_counter
 from logging import getLogger, shutdown
-from ipaddress import ip_address
 from project.src.ExceptionHandler import handle_exceptions
 from project.src.Shared import Address, HORIZONTAL_PARTITIONS, FILEPATH, create_logger, receive, send, generate_matrix, timing, HEADERSIZE, LENGTH, VERTICAL_PARTITIONS
 
@@ -22,11 +22,19 @@ class Client():
         create_logger("client.log")
         CLIENT_LOGGER.info("Starting Client...\n")
 
+        # Ensure 2nd matrix width is not smaller than number of vertical partitions
+        if MATRIX_2_WIDTH < VERTICAL_PARTITIONS:
+            exception_msg = f"2nd matrix's width ({MATRIX_2_WIDTH}) cannot be smaller than number of vertical partitions ({VERTICAL_PARTITIONS})"
+            CLIENT_LOGGER.exception(exception_msg)
+            shutdown()
+            raise ValueError(exception_msg)
+
         # Store server(s) results (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
         self._matrix_products: dict[int, ndarray] = { }
 
         # Select random number N between 1 and # of Servers, inclusive
         self._num_servers: int = random.randint(1, len(addresses) + 1)
+        CLIENT_LOGGER.info(f"Generated number of servers to send jobs to = {self._num_servers}\n")
 
         # Server(s) to send jobs to        
         self._server_addresses: list[Address] = self._select_servers(addresses)
@@ -112,8 +120,6 @@ class Client():
         Returns:
             ndarray: Product of Matrix A and Matrix B 
         """
-        CLIENT_LOGGER.info(f"Generated number of servers to send jobs to = {self._num_servers}\n")
-
         # Start timer
         start = perf_counter()
         
@@ -172,6 +178,36 @@ class Client():
 
         return data
 
+    def _read_file_reverse(self, filepath: str = FILEPATH) -> Iterator[str]:
+        """
+        Read file in reverse
+
+        Args:
+            filepath (str, optional): Path of file to read from. Defaults to FILEPATH.
+
+        Yields:
+            Iterator[str]: Line(s) in file at filepath
+        """
+        with open(filepath, "rb") as file:
+            file.seek(0, SEEK_END)
+            pointer_location = file.tell()
+            buffer = bytearray()
+
+            while pointer_location >= 0:
+                file.seek(pointer_location)
+                pointer_location -= 1
+                new_byte = file.read(1)
+
+                # If newline, add buffer to list, clear buffer
+                if new_byte == b"\n":
+                    yield buffer.decode()[::-1]
+                    buffer = bytearray()
+
+                # Else, add new_byte to buffer
+                else: buffer.extend(new_byte)
+
+            if len(buffer) > 0: yield buffer.decode()[::-1]
+
     def _select_servers(self, addresses: list[Address]) -> list[Address]:
         """
         Selects a subset of server(s) with the highest compute power (i.e. most CPUs) to send jobs to
@@ -205,60 +241,89 @@ class Client():
             shutdown()
             raise IOError(exception_msg)
 
-        server_cpu, server_ram = { }, { }
+        valid_servers = { }
+        
+        # Read file containing server addresses, their CPU, and available RAM in reverse (i.e., most recent information first)
+        for line in self._read_file_reverse():
+            if line == "" or line == "\n": continue
+            # Get IP Address, port, CPU, and available RAM of server
+            curr_ip, curr_port, curr_cpu, curr_ram = line.split(" ")[:4]
+            curr_address = Address(curr_ip, int(curr_port))
 
-        # Read file containing server addresses, their CPU, and available RAM
-        with open(FILEPATH, "r") as file:
-            for line in file:
-                # Get IP Address, port, CPU, and available RAM of server
-                curr_ip, curr_port, curr_cpu, curr_ram = line.split(" ")[:4]
-                curr_address = Address(curr_ip, int(curr_port))
+            # Add server address, its CPU, and available RAM to valid_servers if not already in it
+            if curr_address not in valid_servers.keys() and self._is_valid(curr_address):
+                CLIENT_LOGGER.info(f"Adding info from {line} to valid_servers\n")
+                valid_servers[curr_address] = (int(curr_cpu), float(curr_ram))
 
-                # Add server address, its CPU, and available RAM to dict if not already in it
-                if curr_address not in (server_cpu.keys() or server_ram.keys()):
-                    server_cpu[curr_address] = curr_cpu
-                    server_ram[curr_address] = curr_ram
+        # Check if all valid servers have the same CPU, same available RAM
+        same_cpu, same_ram = self._same_cpu_ram(valid_servers)
 
-        # Check if all selected servers have the same CPU
-        if len(set(server_cpu.values())) == 1:
-            # Check if all selected servers with same CPU have the same available RAM
-            if len(set(server_ram.values())) == 1:
-                # TODO Verify these servers?
-                return sample(list(server_ram.keys()), self._num_servers)
+        servers_list = [ ]
+        
+        if same_cpu:
+            if same_ram:
+                # Return random sample of valid servers since they have same CPU and available RAM
+                servers_list = sample(list(valid_servers.keys()), self._num_servers)
 
-            # Otherwise, return the top servers (i.e. servers with most available RAM)
-            return self._verify_addresses(sorted(server_ram, reverse = True))
+            # Return top valid servers with most available RAM
+            else: servers_list = sorted(valid_servers.keys(), key = lambda x: valid_servers[x][1], reverse = True)[:self._num_servers]
+            
+        # Return top valid servers with highest CPU power
+        else: servers_list = sorted(valid_servers.keys(), key = lambda x: valid_servers[x], reverse = True)[:self._num_servers]
 
-        # Otherwise, return the top servers (i.e. servers with highest CPU power)
-        return self._verify_addresses(sorted(server_cpu, reverse = True))
+        CLIENT_LOGGER.info(f"Sending jobs to {servers_list}\n")
+        return servers_list
 
-    def _verify_addresses(self, addresses: list[Address]) -> list[Address]:
+    def _same_cpu_ram(self, servers: dict[Address, tuple[int, float]]) -> tuple[bool, bool]:
         """
-        Get subset of servers that are online AND computationally powerful
+        Check whether or not servers have same CPU, same available RAM
 
         Args:
-            addresses (list[Address]): List of server addresses
+            servers (dict[Address, tuple[int, float]]): Dictionary of servers and their CPU, available RAM
 
         Returns:
-            list[Address]: Subset of addresses to send jobs to
+            tuple[bool, bool]: Whether or not servers have same CPU, same available RAM
         """
-        valid_servers = [ ]
+        same_cpu, same_ram, cpu, ram = True, True, [ ], [ ]
+        
+        for c, r in servers.values():
+            cpu.append(c)
+            ram.append(r)
 
-        for address in addresses:
+        for i in range(1, len(cpu)):
+            if cpu[i] != cpu[i - 1]:
+                same_cpu = False
+                break
+
+        for i in range(1, len(ram)):
+            if ram[i] != ram[i - 1]:
+                same_ram = False
+                break
+
+        return same_cpu, same_ram
+
+    def _is_valid(self, address: Address) -> bool:
+        """
+        Check if server is listening
+
+        Args:
+            address (Address): Server address
+
+        Returns:
+            bool: True if server is listening, else False
+        """
+        with socket(AF_INET, SOCK_STREAM) as sock:
+            sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+
             try:
-                ip_address(address.ip)
-                CLIENT_LOGGER.info(f"Server at {address} is online\n")
-                valid_servers.append(address)
-                
-                if len(valid_servers) == self._num_servers:
-                    break
+                sock.connect_ex(address)
+                CLIENT_LOGGER.info(f"Server at {address} is listening\n")
+                return True
 
-            except ValueError:
-                CLIENT_LOGGER.exception(f"Server at {address} is not online\n")
-                continue                
-                
-        return valid_servers
-
+            except:
+                CLIENT_LOGGER.error(f"Server at {address} is not listening\n")
+                return False
+        
     @handle_exceptions(CLIENT_LOGGER)
     def _work(self) -> None:
         """
@@ -348,14 +413,7 @@ class Client():
             shutdown()
             exit(1)
 
-if __name__ == "__main__":
-    # Ensure 2nd matrix width is not smaller than number of vertical partitions
-    if MATRIX_2_WIDTH < VERTICAL_PARTITIONS:
-        exception_msg = f"2nd matrix's width ({MATRIX_2_WIDTH}) cannot be smaller than number of vertical partitions ({VERTICAL_PARTITIONS})"
-        CLIENT_LOGGER.exception(exception_msg)
-        shutdown()
-        raise ValueError(exception_msg)
-    
+if __name__ == "__main__":    
     # Generate example matrices for testing
     matrix_a = generate_matrix(LENGTH, LENGTH)
     matrix_b = generate_matrix(LENGTH, MATRIX_2_WIDTH)

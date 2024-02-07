@@ -112,13 +112,20 @@ class Server():
             client_socket (socket): Client socket
             data (bytes): Message packet (i.e. data) to send to client
         """
+        start_ack = perf_counter()
+        
         # Add header to and send acknowledgment packet
         send(client_socket, "ACK".encode("utf-8"))
-        SERVER_LOGGER.info(f"Server at {self._server_address} sent acknowledgement to client {client_socket}\n")
+        
+        end_ack = perf_counter()
+        SERVER_LOGGER.info(f"Server at {self._server_address} sent acknowledgement to client {client_socket} in {timing(end_ack, start_ack)} seconds\n")
+        start_send = perf_counter()
         
         # Add header to and send message packet back to client
         send(client_socket, data)
-        SERVER_LOGGER.info(f"Server at {self._server_address} sent message packet back to client {client_socket}\n")
+
+        end_send = perf_counter()
+        SERVER_LOGGER.info(f"Server at {self._server_address} sent message packet back to client {client_socket} in {timing(end_send, start_send)} seconds\n")
 
 
     def _handle_client(self, client_socket: socket) -> None:
@@ -140,7 +147,7 @@ class Server():
         try:
             # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
             matrix_a_partition, matrix_b_partition, index = loads(data)
-            print(f"Received [{index}]: {matrix_a_partition} and {matrix_b_partition}")
+            print(f"Received and unpacked [{index}]: {matrix_a_partition} and {matrix_b_partition}\n")
 
         except EOFError:
             SERVER_LOGGER.info(f"Client {client_socket} is checking if server at {self._server_address} is listening\n")

@@ -1,5 +1,4 @@
 from collections.abc import Iterator
-from mimetypes import init
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
 from numpy import ndarray, random, array_split, concatenate, dot, shape, array_equal
@@ -200,19 +199,17 @@ class Client():
                 pointer_location -= 1
                 new_byte = file.read(1)
 
-                # If newline, add buffer to list, clear buffer
                 if new_byte == b"\n":
                     yield buffer.decode()[::-1]
                     buffer = bytearray()
 
-                # Else, add new_byte to buffer
                 else: buffer.extend(new_byte)
 
             if len(buffer) > 0: yield buffer.decode()[::-1]
 
     def _select_servers(self, addresses: list[Address]) -> list[Address]:
         """
-        Selects a subset of server(s) with the highest compute power (i.e. most CPUs) to send jobs to
+        Selects a subset of server(s) with the highest compute power to send jobs to
 
         Args:
             addresses (list[Address]): List of server addresses
@@ -254,7 +251,7 @@ class Client():
             curr_address = Address(curr_ip, int(curr_port))
 
             # Add server address, its CPU, and available RAM to valid_servers if not already in it
-            if curr_address not in valid_servers.keys() and self._is_valid(curr_address):
+            if curr_address not in valid_servers.keys() and self._is_server_listening(curr_address):
                 CLIENT_LOGGER.info(f"Adding info from {line} to valid_servers\n")
                 valid_servers[curr_address] = (int(curr_cpu), float(curr_ram))
 
@@ -305,7 +302,7 @@ class Client():
         
         return same_cpu, same_ram
 
-    def _is_valid(self, address: Address) -> bool:
+    def _is_server_listening(self, address: Address) -> bool:
         """
         Check if server is listening
 
@@ -331,7 +328,7 @@ class Client():
     def _work(self) -> None:
         """
         Send partitioned matrices to server(s), get results,
-        then add them to dictionary for combining laters
+        then add them to dictionary for combining later
         """
         # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0

@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from mimetypes import init
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
 from numpy import ndarray, random, array_split, concatenate, dot, shape, array_equal
@@ -274,6 +275,7 @@ class Client():
         # Return top valid servers with highest CPU power
         else: return sorted(valid_servers.keys(), key = lambda x: valid_servers[x], reverse = True)[:self._num_servers]
 
+    # TODO Create data structure for dict[Address, tuple[int, float]]
     def _same_cpu_ram(self, servers: dict[Address, tuple[int, float]]) -> tuple[bool, bool]:
         """
         Check whether or not servers have same CPU, same available RAM
@@ -285,21 +287,18 @@ class Client():
             tuple[bool, bool]: Whether or not servers have same CPU, same available RAM
         """
         start = perf_counter()
-        same_cpu, same_ram, cpu, ram = True, True, [ ], [ ]
+        same_cpu, same_ram, seen_cpu, seen_ram = True, True, set(), set()
         
         for c, r in servers.values():
-            cpu.append(c)
-            ram.append(r)
+            if same_cpu:
+                if c in seen_cpu: same_cpu = False
+                else: seen_cpu.add(c)
 
-        for i in range(1, len(cpu)):
-            if cpu[i] != cpu[i - 1]:
-                same_cpu = False
-                break
+            if same_ram:
+                if r in seen_ram: same_ram = False
+                else: seen_ram.add(r)
 
-        for i in range(1, len(ram)):
-            if ram[i] != ram[i - 1]:
-                same_ram = False
-                break
+            if not same_cpu and not same_ram: break
 
         end = perf_counter()
         CLIENT_LOGGER.info(f"Checked if servers have same CPU and available RAM in {timing(end, start)} seconds\n")

@@ -14,7 +14,7 @@ HEADERSIZE = 10
 SIG_FIGS = 5
 FILE_DIRECTORY_PATH = path.join(getcwd(), "project", "file")
 FILENAME = "server_info.txt"
-FILEPATH = path.join(FILE_DIRECTORY_PATH, FILENAME)
+FILEPATH = path.join(FILE_DIRECTORY_PATH, "server_info", FILENAME)
 
 class Address(NamedTuple):
     """

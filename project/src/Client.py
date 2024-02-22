@@ -86,7 +86,7 @@ class Client():
         Combines submatrices into a single matrix
 
         Args:
-            matrix_products (dict[int, ndarray]): Dictionary to store results (i.e. Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
+            matrix_products (dict[int, ndarray]): Dictionary to store results (i.e., Value = Chunk of Matrix A * Chunk of Matrix B at Key = given position)
 
         Returns:
             ndarray: Combined result of given matrices
@@ -360,8 +360,8 @@ class Client():
                     # Receive result from server
                     data = self._handle_server(sock, dumps(partitions))
                     
-                    # Unpack data (i.e. product of partitions and its position) from server
-                    result, index = loads(data)
+                    # Unpack data (i.e. position and product of partitions) from server
+                    index, result = loads(data)
 
                     # End timer
                     end = perf_counter()

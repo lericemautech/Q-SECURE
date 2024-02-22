@@ -1,7 +1,6 @@
 from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
 from numpy import ndarray, dot
-from typing import NamedTuple
 from os import O_WRONLY, path, cpu_count, umask, O_CREAT
 from os import open as opener
 from logging import getLogger, shutdown
@@ -9,6 +8,7 @@ from threading import Thread
 from time import perf_counter
 from psutil import virtual_memory
 from platform import platform
+from typing import NamedTuple
 from datetime import datetime
 from project.src.ExceptionHandler import handle_exceptions
 from project.src.Shared import Address, create_logger, timing, receive, send, FILEPATH, FILE_DIRECTORY_PATH
@@ -19,8 +19,14 @@ from project.src.Shared import Address, create_logger, timing, receive, send, FI
 SERVER_LOGGER = getLogger(__name__)
 
 class Matrix(NamedTuple):
-    matrix: ndarray
+    """
+    Tuple defining matrix and its position
+
+    Args:
+        NamedTuple (int, ndarray): Index and matrix
+    """
     index: int
+    matrix: ndarray
 
 # TODO Finish writing this class
 class ClientThread(Thread):
@@ -96,10 +102,10 @@ class Server():
             index (int): Matrix position
 
         Returns:
-            Matrix: Multiple of Matrix A and Matrix B, its position
+            Matrix: Position and multiple of Matrix A and Matrix B
         """
         start = perf_counter()
-        product = Matrix(dot(matrix_a, matrix_b), index)
+        product = Matrix(index, dot(matrix_a, matrix_b))
         end = perf_counter()
         SERVER_LOGGER.info(f"Multiplied matrices in {timing(end, start)} seconds\n")
         return product

@@ -1,26 +1,18 @@
 from socket import socket, AF_INET, SOCK_STREAM
-from ssl import SSLContext
+from ssl import SSLContext, OP_NO_TLSv1, OP_NO_TLSv1_1, OP_NO_TLSv1_2, OP_NO_SSLv2, OP_NO_SSLv3
 
 class SSLClient:
     def __init__(
-        self, server_host, server_port, server_sni_hostname, client_cert, client_key,
+        self, server_host, server_port, client_cert, client_key,
     ):
         self.server_host = server_host
         self.server_port = server_port
-        self.server_sni_hostname = server_sni_hostname
         self._context = SSLContext()
+        # only use TLSv1.3 (latest version of TLS at the moment)
+        self._context.options |= OP_NO_TLSv1 | OP_NO_TLSv1_1 | OP_NO_TLSv1_2 | OP_NO_SSLv2 | OP_NO_SSLv3
         self._context.load_cert_chain(client_cert, client_key)
-        self._sock = None
-
-    def __del__(self):
-        self.close()
 
     def connect(self):
-        self._sock = self._context.wrap_socket(socket(AF_INET, SOCK_STREAM),server_hostname=self.server_sni_hostname)
-        self._sock.connect((self.server_host, self.server_port))
-
-    def send(self, msg):
-        self._sock.send(msg.encode()) # type: ignore
-
-    def close(self):
-        self._sock.close() # type: ignore
+        with self._context.wrap_socket(socket(AF_INET, SOCK_STREAM)) as sock:
+            sock.connect((self.server_host, self.server_port))
+            sock.send(b"Hello, world!")

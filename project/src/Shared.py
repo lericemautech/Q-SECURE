@@ -27,11 +27,12 @@ MAX_NUM_FILES = 10
 FILEPATH = path.join(FILE_DIRECTORY_PATH, "server_info", "server_info.txt")
 
 """SSL/TLS Parameters"""
-KEYS_DIRECTORY_PATH = path.join(FILE_DIRECTORY_PATH, "keys")
-CLIENT_CERT = path.join(KEYS_DIRECTORY_PATH, "client.crt")
-CLIENT_KEY = path.join(KEYS_DIRECTORY_PATH, "client.key")
-SERVER_CERT = path.join(KEYS_DIRECTORY_PATH, "server.crt")
-SERVER_KEY = path.join(KEYS_DIRECTORY_PATH, "server.key")
+KEYCHAIN_PATH = "/Users/kiran/.ssh/Certificates/Q-SECURE"
+CERTIFICATE_AUTHORITY = path.join(KEYCHAIN_PATH, "ca-cert.cer.pem")
+CLIENT_CERT = path.join(KEYCHAIN_PATH, "client.cer.pem")
+CLIENT_KEY = path.join(KEYCHAIN_PATH, "client.key.pem")
+SERVER_CERT = path.join(KEYCHAIN_PATH, "server.cer.pem")
+SERVER_KEY = path.join(KEYCHAIN_PATH, "server.key.pem")
 
 class Address(NamedTuple):
     """

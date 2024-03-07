@@ -1,6 +1,6 @@
 from socket import socket, AF_INET, SOCK_STREAM
 from ssl import TLSVersion, create_default_context, Purpose
-from project.src.Shared import send, SERVER_ADDRESSES, CERTIFICATE_AUTHORITY, CLIENT_CERT, CLIENT_KEY
+from project.src.Shared import send, TLS_LOG, SERVER_ADDRESSES, CERTIFICATE_AUTHORITY, CLIENT_CERT, CLIENT_KEY
 
 class SSLClient:
     def __init__(
@@ -11,8 +11,8 @@ class SSLClient:
         self._context = create_default_context(Purpose.SERVER_AUTH, cafile = CERTIFICATE_AUTHORITY)
         self._context.load_cert_chain(CLIENT_CERT, CLIENT_KEY)
         self._context.check_hostname = True
-        # Use TLSv1.3 (latest version of TLS at the moment)
-        self._context.minimum_version = TLSVersion.TLSv1_3
+        self._context.minimum_version = TLSVersion.TLSv1_3 # Latest version of TLS
+        self._context.keylog_filename = TLS_LOG
 
     def connect(self):
         with self._context.wrap_socket(socket(AF_INET, SOCK_STREAM), server_hostname=self.server_host) as sock:

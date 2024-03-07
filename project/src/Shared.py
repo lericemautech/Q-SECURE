@@ -4,35 +4,37 @@ from numpy import ndarray, random
 from os import getcwd, path
 from logging.config import fileConfig
 
-"""Matrix Parameters"""
 MIN = 0
 MAX = 5
 LENGTH = 32
 SIG_FIGS = 5
+"""Matrix Parameters"""
 
-"""Partition Parameters"""
 HORIZONTAL_PARTITIONS = 16
 VERTICAL_PARTITIONS = 2
+"""Partition Parameters"""
 
-"""Socket Parameters"""
 BUFFER = 4096
 HEADERSIZE = 10
 ACKNOWLEDGEMENT = "ACK"
+"""Socket Parameters"""
 
-"""File Directory Path"""
 FILE_DIRECTORY_PATH = path.join(getcwd(), "project", "file")
+KEYCHAIN_PATH = "/Users/kiran/.ssh/Certificates/Q-SECURE"
+LOG_PATH = path.join(FILE_DIRECTORY_PATH, "logging")
+"""Parent Directory Paths"""
 
-"""Server Info Parameters"""
 MAX_NUM_FILES = 10
 FILEPATH = path.join(FILE_DIRECTORY_PATH, "server_info", "server_info.txt")
+"""Server Info Parameters"""
 
-"""SSL/TLS Parameters"""
-KEYCHAIN_PATH = "/Users/kiran/.ssh/Certificates/Q-SECURE"
 CERTIFICATE_AUTHORITY = path.join(KEYCHAIN_PATH, "ca-cert.cer.pem")
 CLIENT_CERT = path.join(KEYCHAIN_PATH, "client.cer.pem")
 CLIENT_KEY = path.join(KEYCHAIN_PATH, "client.key.pem")
 SERVER_CERT = path.join(KEYCHAIN_PATH, "server.cer.pem")
 SERVER_KEY = path.join(KEYCHAIN_PATH, "server.key.pem")
+TLS_LOG = path.join(LOG_PATH, "tls.log")
+"""SSL/TLS Parameters"""
 
 class Address(NamedTuple):
     """
@@ -49,7 +51,7 @@ SERVER_ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), A
 #SERVER_ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
 
 def create_logger(log_name: str) -> None:
-    fileConfig(path.join(FILE_DIRECTORY_PATH, "logging", "log.conf"), defaults = { "logfilename" : log_name, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
+    fileConfig(path.join(LOG_PATH, "log.conf"), defaults = { "logfilename" : log_name, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
 
 def send(sock: socket, data: bytes) -> None:
     """

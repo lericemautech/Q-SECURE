@@ -1,6 +1,6 @@
 from socket import socket, AF_INET, SOCK_STREAM
 from ssl import create_default_context, Purpose, TLSVersion
-from project.src.Shared import CERTIFICATE_AUTHORITY, SERVER_CERT, SERVER_KEY, receive
+from project.src.Shared import TLS_LOG, CERTIFICATE_AUTHORITY, SERVER_CERT, SERVER_KEY, receive
 from project.src.ssl.ssl_test import server_host, server_port
 
 class SSLServer:
@@ -9,8 +9,8 @@ class SSLServer:
         self.port = port
         self._context = create_default_context(Purpose.CLIENT_AUTH, cafile = CERTIFICATE_AUTHORITY)
         self._context.load_cert_chain(SERVER_CERT, SERVER_KEY)
-        # Use TLSv1.3 (latest version of TLS at the moment)
-        self._context.minimum_version = TLSVersion.TLSv1_3
+        self._context.minimum_version = TLSVersion.TLSv1_3 # Latest version of TLS
+        self._context.keylog_filename = TLS_LOG
         
     def connect(self):
         with socket(AF_INET, SOCK_STREAM, 0) as sock:

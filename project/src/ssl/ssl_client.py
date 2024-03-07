@@ -1,21 +1,22 @@
 from socket import socket, AF_INET, SOCK_STREAM
-from ssl import SSLContext, OP_NO_TLSv1, OP_NO_TLSv1_1, OP_NO_TLSv1_2, OP_NO_SSLv2, OP_NO_SSLv3
-from project.src.Shared import send
+from ssl import TLSVersion, create_default_context, Purpose
+from project.src.Shared import send, SERVER_ADDRESSES, CERTIFICATE_AUTHORITY, CLIENT_CERT, CLIENT_KEY
 
 class SSLClient:
     def __init__(
-        self, server_host, server_port, client_cert, client_key,
+        self, server_host, server_port
     ):
         self.server_host = server_host
         self.server_port = server_port
-        self._context = SSLContext()
-        # only use TLSv1.3 (latest version of TLS at the moment)
-        self._context.options |= OP_NO_TLSv1 | OP_NO_TLSv1_1 | OP_NO_TLSv1_2 | OP_NO_SSLv2 | OP_NO_SSLv3
-        self._context.load_cert_chain(client_cert, client_key)
+        self._context = create_default_context(Purpose.SERVER_AUTH, cafile = CERTIFICATE_AUTHORITY)
+        self._context.load_cert_chain(CLIENT_CERT, CLIENT_KEY)
+        self._context.check_hostname = True
+        # Use TLSv1.3 (latest version of TLS at the moment)
+        self._context.minimum_version = TLSVersion.TLSv1_3
 
     def connect(self):
-        with self._context.wrap_socket(socket(AF_INET, SOCK_STREAM)) as sock:
-            sock.connect((self.server_host, self.server_port))
+        with self._context.wrap_socket(socket(AF_INET, SOCK_STREAM), server_hostname=self.server_host) as sock:
+            sock.connect(SERVER_ADDRESSES[0])#(self.server_host, self.server_port))
             send(sock, b"Hello, server! This was encrypted.")
 
 # openssl req -newkey rsa:2048 -x509 -sha256 -nodes -out device.csr -keyout device.key -addext "subjectAltName=DNS:127.0.0.1" -subj "/O=ACyD Lab/CN=127.0.0.1"

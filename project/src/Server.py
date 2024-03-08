@@ -9,12 +9,9 @@ from psutil import virtual_memory
 from platform import platform
 from typing import NamedTuple
 from datetime import datetime
-from ssl import create_default_context, Purpose, TLSVersion, VERIFY_X509_STRICT
 from project.src.ExceptionHandler import handle_exceptions
 from project.src.Shared import (Address, ACKNOWLEDGEMENT, FILEPATH,
-                                FILE_DIRECTORY_PATH, SERVER_CERT,
-                                SERVER_KEY, CERTIFICATE_AUTHORITY,
-                                TLS_LOG, create_logger,
+                                FILE_DIRECTORY_PATH, create_logger,
                                 timing, receive, send)
 
 # TODO Fix logging for server(s)
@@ -76,18 +73,6 @@ class Server():
             shutdown()
             raise NotADirectoryError(exception_msg)
 
-        # Create context for SSL/TLS connection
-        # TODO Exception handling for SSL/TLS connection
-        self._context = create_default_context(Purpose.CLIENT_AUTH, cafile = CERTIFICATE_AUTHORITY)
-
-        # Load server's certificate and key, and client's certificate
-        self._context.load_cert_chain(SERVER_CERT, SERVER_KEY)
-        self._context.minimum_version = TLSVersion.TLSv1_3 # Latest version of TLS
-        self._context.keylog_filename = TLS_LOG
-        self._context.verify_flags = VERIFY_X509_STRICT
-        self._context.set_ciphers("HIGH:RSA")
-
-        
         # Write Server's IP Address, port, number of cores, available RAM, OS, and timestamp to FILEPATH
         self._document_info()
 
@@ -224,10 +209,7 @@ class Server():
 
                     # Handle client (i.e. get position and partitions of Matrix A and Matrix B,
                     # multiply them, then send result and its position back to client)
-                    with self._context.wrap_socket(client_socket, server_side = True) as wrapped_sock:
-                    # with self._context.wrap_socket(client_socket, server_side = True) as sconn:
-                    #     self._handle_client(sconn)
-                        self._handle_client(wrapped_sock)
+                    self._handle_client(client_socket)
 
         except KeyboardInterrupt:
             print(f"\nServer at {self._server_address} disconnected")

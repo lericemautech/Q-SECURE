@@ -7,13 +7,11 @@ from os import path, SEEK_END
 from random import sample
 from time import perf_counter
 from logging import getLogger, shutdown
-from ssl import VERIFY_X509_STRICT, create_default_context, Purpose, TLSVersion
 from project.src.ExceptionHandler import handle_exceptions
 from project.src.Shared import (Address, ACKNOWLEDGEMENT, HORIZONTAL_PARTITIONS,
                                 FILEPATH, SERVER_ADDRESSES, HEADERSIZE, LENGTH,
-                                VERTICAL_PARTITIONS, CLIENT_CERT, CLIENT_KEY,
-                                CERTIFICATE_AUTHORITY, TLS_LOG,
-                                create_logger, receive, send, generate_matrix, timing)
+                                VERTICAL_PARTITIONS, create_logger, receive,
+                                send, generate_matrix, timing)
 
 MATRIX_2_WIDTH = 2
 CLIENT_LOGGER = getLogger(__name__)
@@ -43,19 +41,6 @@ class Client():
         # Server(s) to send jobs to        
         self._server_addresses: list[Address] = self._select_servers(server_addresses)
         CLIENT_LOGGER.info(f"Sending jobs to {self._server_addresses}\n")
-
-        # Create context for SSL/TLS connection
-        # TODO Catch any SSL/TLS exceptions
-        self._context = create_default_context(Purpose.SERVER_AUTH, cafile = CERTIFICATE_AUTHORITY)
-
-        # Load client certificates for SSL/TLS connection
-        self._context.load_cert_chain(CLIENT_CERT, CLIENT_KEY)
-        
-        # Latest version of TLS
-        self._context.minimum_version = TLSVersion.TLSv1_3
-        self._context.keylog_filename = TLS_LOG
-        self._context.verify_flags = VERIFY_X509_STRICT
-        self._context.set_ciphers("HIGH:RSA")
 
         # Create and queue partitions of Matrix A and Matrix B and their position, to be sent to selected server(s)
         self._partitions: Queue = self._queue_partitions(matrix_a, matrix_b)
@@ -364,8 +349,6 @@ class Client():
 
                     # Address of server
                     server_address = self._server_addresses[i % len(self._server_addresses)]
-
-                    sock = self._context.wrap_socket(sock, server_hostname = server_address.ip)
 
                     # Start timer
                     start = perf_counter()

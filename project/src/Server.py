@@ -1,8 +1,7 @@
-from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
+from socket import socket, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
 from numpy import ndarray, dot
-from os import O_WRONLY, path, cpu_count, umask, O_CREAT
-from os import open as opener
+from os import path, cpu_count, umask, O_CREAT, O_WRONLY, open as opener
 from logging import getLogger, shutdown
 from threading import Thread
 from time import perf_counter
@@ -10,8 +9,13 @@ from psutil import virtual_memory
 from platform import platform
 from typing import NamedTuple
 from datetime import datetime
+from ssl import create_default_context, Purpose, TLSVersion, VERIFY_X509_STRICT
 from project.src.ExceptionHandler import handle_exceptions
-from project.src.Shared import Address, create_logger, timing, receive, send, FILEPATH, FILE_DIRECTORY_PATH
+from project.src.Shared import (Address, ACKNOWLEDGEMENT, FILEPATH,
+                                FILE_DIRECTORY_PATH, SERVER_CERT,
+                                SERVER_KEY, CERTIFICATE_AUTHORITY,
+                                TLS_LOG, create_logger,
+                                timing, receive, send)
 
 # TODO Fix logging for server(s)
 # https://docs.python.org/2/howto/logging-cookbook.html#sending-and-receiving-logging-events-across-a-network
@@ -71,12 +75,24 @@ class Server():
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
             raise NotADirectoryError(exception_msg)
+
+        # Create context for SSL/TLS connection
+        # TODO Exception handling for SSL/TLS connection
+        self._context = create_default_context(Purpose.CLIENT_AUTH, cafile = CERTIFICATE_AUTHORITY)
+
+        # Load server's certificate and key, and client's certificate
+        self._context.load_cert_chain(SERVER_CERT, SERVER_KEY)
+        self._context.minimum_version = TLSVersion.TLSv1_3 # Latest version of TLS
+        self._context.keylog_filename = TLS_LOG
+        self._context.verify_flags = VERIFY_X509_STRICT
+        self._context.set_ciphers("HIGH:RSA")
+
         
         # Write Server's IP Address, port, number of cores, available RAM, OS, and timestamp to FILEPATH
         self._document_info()
 
-# TODO Filesize threshold ~1GB
-# TODO After x lines, create new file. After creating N files, delete N - 1 files.
+    # TODO Filesize threshold ~1GB
+    # TODO After x lines, create new file. After creating N files, delete N - 1 files.
     def _document_info(self) -> None:
         """
         Document server's IP Address, port, number of cores, available RAM, OS, and timestamp to FILEPATH
@@ -121,7 +137,7 @@ class Server():
         start_ack = perf_counter()
         
         # Add header to and send acknowledgment packet
-        send(client_socket, "ACK".encode("utf-8"))
+        send(client_socket, ACKNOWLEDGEMENT.encode("utf-8"))
         
         end_ack = perf_counter()
         SERVER_LOGGER.info(f"Server at {self._server_address} sent acknowledgement to client {client_socket} in {timing(end_ack, start_ack)} seconds\n")
@@ -132,7 +148,6 @@ class Server():
 
         end_send = perf_counter()
         SERVER_LOGGER.info(f"Server at {self._server_address} sent message packet back to client {client_socket} in {timing(end_send, start_send)} seconds\n")
-
 
     def _handle_client(self, client_socket: socket) -> None:
         """
@@ -146,7 +161,7 @@ class Server():
         """
         # Start timer
         start = perf_counter()
-        
+
         # Receive data from client
         data = receive(client_socket)
         
@@ -187,7 +202,7 @@ class Server():
         start = perf_counter()
         
         try:
-            with socket(AF_INET, SOCK_STREAM) as server_socket:                
+            with socket() as server_socket:                
                 # Allow reuse of address
                 server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
@@ -205,9 +220,14 @@ class Server():
                     client_socket, client_address = server_socket.accept()
                     SERVER_LOGGER.info(f"Server at {self._server_address} accepted connection from {client_address}\n")
 
+                    # TODO Break out of while loop if client address is not an allowed address
+
                     # Handle client (i.e. get position and partitions of Matrix A and Matrix B,
                     # multiply them, then send result and its position back to client)
-                    self._handle_client(client_socket)
+                    with self._context.wrap_socket(client_socket, server_side = True) as wrapped_sock:
+                    # with self._context.wrap_socket(client_socket, server_side = True) as sconn:
+                    #     self._handle_client(sconn)
+                        self._handle_client(wrapped_sock)
 
         except KeyboardInterrupt:
             print(f"\nServer at {self._server_address} disconnected")

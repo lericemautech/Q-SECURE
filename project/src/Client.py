@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
+from socket import socket, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
 from numpy import ndarray, random, array_split, concatenate, dot, shape, array_equal
 from queue import Queue
@@ -7,17 +7,21 @@ from os import path, SEEK_END
 from random import sample
 from time import perf_counter
 from logging import getLogger, shutdown
+from ssl import VERIFY_X509_STRICT, create_default_context, Purpose, TLSVersion
 from project.src.ExceptionHandler import handle_exceptions
-from project.src.Shared import Address, HORIZONTAL_PARTITIONS, FILEPATH, create_logger, receive, send, generate_matrix, timing, HEADERSIZE, LENGTH, VERTICAL_PARTITIONS
+from project.src.Shared import (Address, ACKNOWLEDGEMENT, HORIZONTAL_PARTITIONS,
+                                FILEPATH, SERVER_ADDRESSES, HEADERSIZE, LENGTH,
+                                VERTICAL_PARTITIONS, CLIENT_CERT, CLIENT_KEY,
+                                CERTIFICATE_AUTHORITY, TLS_LOG,
+                                create_logger, receive, send, generate_matrix, timing)
 
 MATRIX_2_WIDTH = 2
 CLIENT_LOGGER = getLogger(__name__)
-# TODO Relocate ADDRESSES to separate file for improved security and editing
-ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
-#ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
+
+# TODO Implement load balancer for client-servers
 
 class Client():
-    def __init__(self, matrix_a: ndarray, matrix_b: ndarray, addresses: list[Address] = ADDRESSES):
+    def __init__(self, matrix_a: ndarray, matrix_b: ndarray, server_addresses: list[Address] = SERVER_ADDRESSES):
         # Logging
         create_logger("client.log")
         CLIENT_LOGGER.info("Starting Client...\n")
@@ -33,12 +37,25 @@ class Client():
         self._matrix_products: dict[int, ndarray] = { }
 
         # Select random number N between 1 and # of Servers, inclusive
-        self._num_servers: int = random.randint(1, len(addresses) + 1)
+        self._num_servers: int = random.randint(1, len(server_addresses) + 1)
         CLIENT_LOGGER.info(f"Generated number of servers to send jobs to = {self._num_servers}\n")
 
         # Server(s) to send jobs to        
-        self._server_addresses: list[Address] = self._select_servers(addresses)
+        self._server_addresses: list[Address] = self._select_servers(server_addresses)
         CLIENT_LOGGER.info(f"Sending jobs to {self._server_addresses}\n")
+
+        # Create context for SSL/TLS connection
+        # TODO Catch any SSL/TLS exceptions
+        self._context = create_default_context(Purpose.SERVER_AUTH, cafile = CERTIFICATE_AUTHORITY)
+
+        # Load client certificates for SSL/TLS connection
+        self._context.load_cert_chain(CLIENT_CERT, CLIENT_KEY)
+        
+        # Latest version of TLS
+        self._context.minimum_version = TLSVersion.TLSv1_3
+        self._context.keylog_filename = TLS_LOG
+        self._context.verify_flags = VERIFY_X509_STRICT
+        self._context.set_ciphers("HIGH:RSA")
 
         # Create and queue partitions of Matrix A and Matrix B and their position, to be sent to selected server(s)
         self._partitions: Queue = self._queue_partitions(matrix_a, matrix_b)
@@ -165,7 +182,7 @@ class Client():
         # Verify acknowledgment
         ack_msg_length = int(ack_data.decode("utf-8").strip())
         ack_msg = server_socket.recv(ack_msg_length).decode("utf-8").strip()
-        if ack_msg != "ACK":
+        if ack_msg != ACKNOWLEDGEMENT:
             exception_msg = f"Invalid acknowledgment \"{ack_msg}\""
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
@@ -207,12 +224,12 @@ class Client():
 
             if len(buffer) > 0: yield buffer.decode()[::-1]
 
-    def _select_servers(self, addresses: list[Address]) -> list[Address]:
+    def _select_servers(self, server_addresses: list[Address]) -> list[Address]:
         """
         Selects a subset of server(s) with the highest compute power to send jobs to
 
         Args:
-            addresses (list[Address]): List of server addresses
+            server_addresses (list[Address]): List of server addresses
 
         Raises:
             ValueError: Invalid number of servers
@@ -222,7 +239,7 @@ class Client():
         Returns:
             list[Address]: List of server addresses to send jobs to
         """
-        if self._num_servers > len(addresses) or self._num_servers < 1:
+        if self._num_servers > len(server_addresses) or self._num_servers < 1:
             exception_msg = f"{self._num_servers} is an invalid number of servers"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
@@ -286,14 +303,14 @@ class Client():
         start = perf_counter()
         same_cpu, same_ram, seen_cpu, seen_ram = True, True, set(), set()
         
-        for c, r in servers.values():
+        for cpu, ram in servers.values():
             if same_cpu:
-                if c in seen_cpu: same_cpu = False
-                else: seen_cpu.add(c)
+                if cpu in seen_cpu: same_cpu = False
+                else: seen_cpu.add(cpu)
 
             if same_ram:
-                if r in seen_ram: same_ram = False
-                else: seen_ram.add(r)
+                if ram in seen_ram: same_ram = False
+                else: seen_ram.add(ram)
 
             if not same_cpu and not same_ram: break
 
@@ -312,7 +329,7 @@ class Client():
         Returns:
             bool: True if server is listening, else False
         """
-        with socket(AF_INET, SOCK_STREAM) as sock:
+        with socket() as sock:
             sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
             try:
@@ -339,12 +356,16 @@ class Client():
         # While there's still partitions to send to server(s)
         while not self._partitions.empty():
             try:
-                with socket(AF_INET, SOCK_STREAM) as sock:
+                #with self._context.wrap_socket(socket(AF_INET, SOCK_STREAM), server_hostname = SERVER_SNI_HOSTNAME) as sock:
+                with socket() as sock:
+                    #sock = self._context.wrap_socket(sock, server_hostname = SERVER_SNI_HOSTNAME)
                     # Allow reuse of address
                     sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
                     # Address of server
                     server_address = self._server_addresses[i % len(self._server_addresses)]
+
+                    sock = self._context.wrap_socket(sock, server_hostname = server_address.ip)
 
                     # Start timer
                     start = perf_counter()

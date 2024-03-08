@@ -5,27 +5,43 @@ from os import getcwd, path
 from logging.config import fileConfig
 
 MIN = 0
+"""Smallest value in matrix"""
+
 MAX = 5
+"""Largest value in matrix"""
+
 LENGTH = 32
+"""Matrix size"""
+
 SIG_FIGS = 5
-"""Matrix Parameters"""
+"""Number of significant figures in timing"""
 
 HORIZONTAL_PARTITIONS = 16
+"""Number of horizontal partitions in matrix"""
+
 VERTICAL_PARTITIONS = 2
-"""Partition Parameters"""
+"""Number of vertical partitions in matrix"""
 
 BUFFER = 4096
+"""Socket buffer size"""
+
 HEADERSIZE = 10
+"""Socket header size"""
+
 ACKNOWLEDGEMENT = "ACK"
-"""Socket Parameters"""
+"""Socket acknowledgement message"""
 
 FILE_DIRECTORY_PATH = path.join(getcwd(), "project", "file")
+"""Parent directory path"""
+
 LOG_PATH = path.join(FILE_DIRECTORY_PATH, "logging")
-"""Parent Directory Paths"""
+"""Log files directory path"""
 
 MAX_NUM_FILES = 10
+"""Maximum number of log files"""
+
 FILEPATH = path.join(FILE_DIRECTORY_PATH, "server_info", "server_info.txt")
-"""Server Info Parameters"""
+"""Server info file path"""
 
 class Address(NamedTuple):
     """
@@ -42,6 +58,12 @@ SERVER_ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), A
 #SERVER_ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
 
 def create_logger(log_name: str) -> None:
+    """
+    Create logger from log config
+
+    Args:
+        log_name (str): Log file's name
+    """
     fileConfig(path.join(LOG_PATH, "log.conf"), defaults = { "logfilename" : log_name, "dirpath" : FILE_DIRECTORY_PATH }, disable_existing_loggers = False)
 
 def send(sock: socket, data: bytes) -> None:

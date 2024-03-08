@@ -3,7 +3,7 @@ from socket import socket, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
 from numpy import ndarray, random, array_split, concatenate, dot, shape, array_equal
 from queue import Queue
-from os import path, SEEK_END
+from os import SEEK_END, path
 from random import sample
 from time import perf_counter
 from logging import getLogger, shutdown
@@ -13,20 +13,22 @@ from project.src.Shared import (Address, ACKNOWLEDGEMENT, HORIZONTAL_PARTITIONS,
                                 VERTICAL_PARTITIONS, create_logger, receive,
                                 send, generate_matrix, timing)
 
-MATRIX_2_WIDTH = 2
+MATRIX_B_WIDTH = 2
+"""Matrix B's width"""
+
 CLIENT_LOGGER = getLogger(__name__)
+"""Client logger"""
 
 # TODO Implement load balancer for client-servers
 
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray, server_addresses: list[Address] = SERVER_ADDRESSES):
-        # Logging
         create_logger("client.log")
         CLIENT_LOGGER.info("Starting Client...\n")
 
-        # Ensure 2nd matrix width is not smaller than number of vertical partitions
-        if MATRIX_2_WIDTH < VERTICAL_PARTITIONS:
-            exception_msg = f"2nd matrix's width ({MATRIX_2_WIDTH}) cannot be smaller than number of vertical partitions ({VERTICAL_PARTITIONS})"
+        # Ensure Matrix B's width is not smaller than number of vertical partitions
+        if MATRIX_B_WIDTH < VERTICAL_PARTITIONS:
+            exception_msg = f"Matrix B's width ({MATRIX_B_WIDTH}) cannot be smaller than number of vertical partitions ({VERTICAL_PARTITIONS})"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise ValueError(exception_msg)
@@ -56,7 +58,6 @@ class Client():
         Returns:
             Queue: Queue of partitions of Matrix A and Matrix B and their position
         """
-        # Start timer
         start = perf_counter()
         
         # Split matrix horizontally
@@ -77,7 +78,6 @@ class Client():
             else:
                 queue.put((matrix_a_partitions[i], matrix_b_partitions[i % len(matrix_b_partitions)], i))
 
-        # End timer
         end = perf_counter()
         CLIENT_LOGGER.info(f"Created partitions and queue in {timing(end, start)} seconds\n")
         
@@ -93,7 +93,6 @@ class Client():
         Returns:
             ndarray: Combined result of given matrices
         """
-        # Start timer
         start = perf_counter()
         
         # Get all results from the queue, sorted by its position
@@ -110,7 +109,6 @@ class Client():
         # Combine all results into a single matrix
         combined_results = concatenate(combined_results)
         
-        # End timer
         end = perf_counter()
         CLIENT_LOGGER.info(f"Combined submatrices into a single matrix in {timing(end, start)} seconds\n")
         
@@ -123,7 +121,6 @@ class Client():
         Returns:
             ndarray: Product of Matrix A and Matrix B 
         """
-        # Start timer
         start = perf_counter()
         
         # Send partitioned matrices to randomly selected server(s)
@@ -132,7 +129,6 @@ class Client():
         # Combine [all] results into a single matrix
         result = self._combine_results(self._matrix_products)
 
-        # End timer
         end = perf_counter()
         CLIENT_LOGGER.info(f"Calculated final result in {timing(end, start)} seconds\n")
 
@@ -162,13 +158,13 @@ class Client():
         start_receive = perf_counter()
         
         # Receive acknowledgment from server
-        ack_data = server_socket.recv(HEADERSIZE)
+        acknowledgement_data = server_socket.recv(HEADERSIZE)
 
         # Verify acknowledgment
-        ack_msg_length = int(ack_data.decode("utf-8").strip())
-        ack_msg = server_socket.recv(ack_msg_length).decode("utf-8").strip()
-        if ack_msg != ACKNOWLEDGEMENT:
-            exception_msg = f"Invalid acknowledgment \"{ack_msg}\""
+        acknowledgement_length = int(acknowledgement_data.decode("utf-8").strip())
+        acknowledgement_msg = server_socket.recv(acknowledgement_length).decode("utf-8").strip()
+        if acknowledgement_msg != ACKNOWLEDGEMENT:
+            exception_msg = f"Invalid acknowledgment \"{acknowledgement_msg}\""
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise ValueError(exception_msg)
@@ -224,18 +220,21 @@ class Client():
         Returns:
             list[Address]: List of server addresses to send jobs to
         """
+        # Ensure number of servers is valid
         if self._num_servers > len(server_addresses) or self._num_servers < 1:
             exception_msg = f"{self._num_servers} is an invalid number of servers"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise ValueError(exception_msg)
 
+        # Ensure file containing server information exists
         if not path.exists(FILEPATH):
             exception_msg = f"File at {FILEPATH} does not exist"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise FileNotFoundError(exception_msg)
 
+        # Ensure file containing server information is not empty
         if path.getsize(FILEPATH) == 0:
             exception_msg = f"File at {FILEPATH} is empty"
             CLIENT_LOGGER.exception(exception_msg)
@@ -247,7 +246,9 @@ class Client():
         
         # Read file containing server addresses, their CPU, and available RAM in reverse (i.e., most recent information first)
         for line in self._read_file_reverse():
+            # Skip empty lines or newlines
             if line == "" or line == "\n": continue
+            
             # Get IP Address, port, CPU, and available RAM of server
             curr_ip, curr_port, curr_cpu, curr_ram = line.split(" ")[:4]
             curr_address = Address(curr_ip, int(curr_port))
@@ -274,7 +275,6 @@ class Client():
         # Return top valid servers with highest CPU power
         else: return sorted(valid_servers.keys(), key = lambda x: valid_servers[x], reverse = True)[:self._num_servers]
 
-    # TODO Create data structure for dict[Address, tuple[int, float]]
     def _same_cpu_ram(self, servers: dict[Address, tuple[int, float]]) -> tuple[bool, bool]:
         """
         Check whether or not servers have same CPU, same available RAM
@@ -317,11 +317,13 @@ class Client():
         with socket() as sock:
             sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
+            # If client can connect to server, it means server is listening
             try:
                 sock.connect_ex(address)
                 CLIENT_LOGGER.info(f"Server at {address} is listening\n")
                 return True
 
+            # Client unable to connect to server, so server is not listening
             except:
                 CLIENT_LOGGER.error(f"Server at {address} is not listening\n")
                 return False
@@ -335,15 +337,12 @@ class Client():
         # Index used to determine where to connect (i.e. cycles through available servers; round robin)
         i = 0
 
-        # Start method's timer
         start_work = perf_counter()
 
         # While there's still partitions to send to server(s)
         while not self._partitions.empty():
             try:
-                #with self._context.wrap_socket(socket(AF_INET, SOCK_STREAM), server_hostname = SERVER_SNI_HOSTNAME) as sock:
                 with socket() as sock:
-                    #sock = self._context.wrap_socket(sock, server_hostname = SERVER_SNI_HOSTNAME)
                     # Allow reuse of address
                     sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
@@ -367,9 +366,7 @@ class Client():
                     # Unpack data (i.e. position and product of partitions) from server
                     index, result = loads(data)
 
-                    # End timer
                     end = perf_counter()
-
                     CLIENT_LOGGER.info(f"Client connected, sent, received, and unpacked data from Server at {server_address} in {timing(end, start)} seconds\n")
 
                     # Check if result and index was received (i.e. not None)
@@ -390,13 +387,8 @@ class Client():
                     i += 1
             
             finally:
-                # End method's timer
                 end_work = perf_counter()
-
-                # Log Client's work time
                 CLIENT_LOGGER.info(f"Client worked for {timing(end_work, start_work)} seconds\n")
-                                
-                # Stop logging
                 shutdown()
 
     def print_outcome(self, result: ndarray, check: ndarray) -> None:
@@ -409,18 +401,16 @@ class Client():
         """
         if array_equal(result, check):
             print("CORRECT CALCULATION!")
-            shutdown()
             exit(0)
 
         else:
             print("INCORRECT CALCULATION...")
-            shutdown()
             exit(1)
 
 if __name__ == "__main__":    
     # Generate example matrices for testing
     matrix_a = generate_matrix(LENGTH, LENGTH)
-    matrix_b = generate_matrix(LENGTH, MATRIX_2_WIDTH)
+    matrix_b = generate_matrix(LENGTH, MATRIX_B_WIDTH)
 
     print(f"Matrix A: {matrix_a}\n")
     print(f"Matrix B: {matrix_b}\n")
@@ -428,7 +418,7 @@ if __name__ == "__main__":
     # Create Client to multiply matrices
     client = Client(matrix_a, matrix_b)
 
-    # Get result
+    # Get result and print it
     answer = client.get_result()
     print(f"Final Result Matrix = {answer}\n")
 

@@ -8,6 +8,7 @@ from psutil import virtual_memory
 from platform import platform
 from typing import NamedTuple
 from datetime import datetime
+from netifaces import interfaces, ifaddresses, AF_INET
 from project.src.ExceptionHandler import handle_exceptions
 from project.src.Shared import (Address, ACKNOWLEDGEMENT, FILEPATH,
                                 FILE_DIRECTORY_PATH, create_logger,
@@ -31,19 +32,19 @@ class Matrix(NamedTuple):
     matrix: ndarray
 
 class Server():
-    def __init__(self, address: Address, directory_path: str = FILE_DIRECTORY_PATH):
+    def __init__(self, directory_path: str = FILE_DIRECTORY_PATH):
         create_logger("server.log")
         SERVER_LOGGER.info("Starting Server...\n")
         
+        # Server's IP Address and port
+        server_address: Address | None = self._get_address()
+
         # Check if address is valid (i.e. has IP Address and port)
-        if not all(address):
-            exception_msg = f"{address} does not have a valid IP Address and/or port"
+        if server_address == None or (server_address.ip or server_address.port) == None:
+            exception_msg = f"Unable to determine server's IP Address"
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
             raise ValueError(exception_msg)
-
-        # Server's IP Address and port
-        self._server_address = address
 
         # Check if directory_path exists
         if not path.exists(directory_path):
@@ -60,25 +61,52 @@ class Server():
             raise NotADirectoryError(exception_msg)
 
         # Document server info
-        self._document_info()
+        self._document_info(server_address)
+
+        # Start server
+        self._start_server(server_address)
+
+    def _get_address(self) -> Address | None:
+        """
+        Get server's IP Address and port
+
+        Returns:
+            Address | None: Server's address, if found
+        """
+        for interface in interfaces():
+            if interface == "lo":
+                continue
+
+            i = ifaddresses(interface).get(AF_INET)
+            if i != None:
+                with socket() as sock:
+                    # Bind to open port provided by host
+                    sock.bind((i[0]["addr"], 0))
+                    return Address(sock.getsockname()[0], sock.getsockname()[1])
+
+        return None
 
     # TODO Filesize threshold ~1GB
     # TODO After x lines, create new file. After creating N files, delete N - 1 files.
-    def _document_info(self) -> None:
+    def _document_info(self, address: Address) -> None:
         """
         Document server's IP Address, port, number of cores, available RAM, OS, and timestamp to FILEPATH
-        """
-        # Get current Server's IP Address and port
-        ip, port = self._server_address.ip, self._server_address.port
 
+        Args:
+            address (Address): Server's address
+        """
+        # Newly created file will have no privileges initially revoked
+        # TODO If statement
         umask(0)
+        
+        # Create and write permissions to file for all users
         descriptor = opener(FILEPATH, flags = O_CREAT | O_WRONLY, mode = 0o777)
         
         # Create file and write Server's IP Address, port, number of cores, available RAM, OS, and timestamp to file
         with open(descriptor, "a") as file:
-            file.write(f"{ip} {port} {cpu_count()} {virtual_memory().available / 1000000000:.2f} {platform(terse = True)} {datetime.now()}\n")
+            file.write(f"{address.ip} {address.port} {cpu_count()} {virtual_memory().available / 1000000000:.2f} {platform(terse = True)} {datetime.now()}\n")
 
-        SERVER_LOGGER.info(f"Recorded information and timestamp for server at {self._server_address}\n")
+        SERVER_LOGGER.info(f"Recorded information and timestamp for server at {address}\n")
 
     def _multiply(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> Matrix:
         """
@@ -102,13 +130,14 @@ class Server():
         
         return product
         
-    def _send_client(self, client_socket: socket, data: bytes) -> None:
+    def _send_client(self, client_socket: socket, data: bytes, server_address: Address) -> None:
         """
         Send data to client
 
         Args:
             client_socket (socket): Client socket
             data (bytes): Message packet (i.e. data) to send to client
+            server_address (Address): Server address
         """
         start = perf_counter()
         
@@ -119,14 +148,15 @@ class Server():
         send(client_socket, data)
 
         end = perf_counter()
-        SERVER_LOGGER.info(f"Server at {self._server_address} sent acknowledgement and message packet back to client {client_socket} in {timing(end, start)} seconds\n")
+        SERVER_LOGGER.info(f"Server at {server_address} sent acknowledgement and message packet back to client {client_socket} in {timing(end, start)} seconds\n")
 
-    def _handle_client(self, client_socket: socket) -> None:
+    def _handle_client(self, client_socket: socket, server_address: Address) -> None:
         """
         Get partitions of Matrix A and Matrix B from client, multiply them, then send result back to client
 
         Args:
             client_socket (socket): Client socket
+            server_address (Address): Server address
 
         Raises:
             EOFError: Client is checking if server is listening
@@ -143,27 +173,30 @@ class Server():
 
         # Catch error encountered when client is checking if server is listening
         except EOFError:
-            SERVER_LOGGER.info(f"Client {client_socket} is checking if server at {self._server_address} is listening\n")
+            SERVER_LOGGER.info(f"Client {client_socket} is checking if server at {server_address} is listening\n")
             return
 
         except:
-            SERVER_LOGGER.exception(f"Unexpected error occurred... server at {self._server_address} will stop handling client {client_socket}\n")
+            SERVER_LOGGER.exception(f"Unexpected error occurred... server at {server_address} will stop handling client {client_socket}\n")
             return
 
         # Multiply partitions of Matrix A and Matrix B, while keeping track of their position
         result = self._multiply(matrix_a_partition, matrix_b_partition, index)
         
         # Convert result to bytes, then send back to client
-        self._send_client(client_socket, dumps(result))
+        self._send_client(client_socket, dumps(result), server_address)
         print(f"\nSent: {result}\n")
 
         end = perf_counter()
         SERVER_LOGGER.info(f"Successfully handled client in {timing(end, start)} second(s)\n")
 
     @handle_exceptions(SERVER_LOGGER)
-    def start_server(self) -> None:
+    def _start_server(self, server_address: Address) -> None:
         """
         Start server and listen for connections
+        
+        Args:
+            server_address (Address): Server address
 
         Raises:
             KeyboardInterrupt: Server disconnected due to keyboard (i.e. CTRL + C)
@@ -171,36 +204,36 @@ class Server():
         start = perf_counter()
         
         try:
-            with socket() as server_socket:                
+            with socket() as server_socket:
                 # Allow reuse of address
                 server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
                 # Bind socket to server's address
-                server_socket.bind(self._server_address)
+                server_socket.bind(server_address)
 
                 # Listen for connection(s)
                 server_socket.listen()
-                listen_msg = f"Server at {self._server_address} listening for connection(s)..."
+                listen_msg = f"Server at {server_address} listening for connection(s)..."
                 SERVER_LOGGER.info(f"{listen_msg}\n")
                 print(listen_msg)
 
                 while True:
                     # Accept connection from client
                     client_socket, client_address = server_socket.accept()
-                    SERVER_LOGGER.info(f"Server at {self._server_address} accepted connection from {client_address}\n")
+                    SERVER_LOGGER.info(f"Server at {server_address} accepted connection from {client_address}\n")
 
                     # TODO Break out of while loop if client address is not an allowed address
 
                     # Handle client (i.e. get position and partitions of Matrix A and Matrix B,
                     # multiply them, then send result and its position back to client)
-                    self._handle_client(client_socket)
+                    self._handle_client(client_socket, server_address)
 
         # Catch error encountered when server is disconnected via CTRL + C
         except KeyboardInterrupt:
-            print(f"\nServer at {self._server_address} disconnected")
+            print(f"\nServer at {server_address} disconnected")
             exit(0)
 
         finally:
             end = perf_counter()
-            SERVER_LOGGER.info(f"Server at {self._server_address} ran for {timing(end, start)} seconds")
+            SERVER_LOGGER.info(f"Server at {server_address} ran for {timing(end, start)} seconds")
             shutdown()

@@ -1,7 +1,7 @@
 from socket import socket
 from ssl import Purpose, TLSVersion, VERIFY_X509_STRICT, create_default_context
-from project.src.ssl.ssl_shared import TLS_LOG, CERTIFICATE_AUTHORITY, CLIENT_CERT, CLIENT_KEY
-from project.src.Shared import SERVER_ADDRESSES, send
+from project.src.ssl.ssl_shared import SERVER_ADDRESSES, TLS_LOG, CERTIFICATE_AUTHORITY, CLIENT_CERT, CLIENT_KEY
+from project.src.Shared import send
 
 class SSLClient:
     def __init__(self, address):

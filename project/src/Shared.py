@@ -53,10 +53,6 @@ class Address(NamedTuple):
     ip: str
     port: int
 
-# TODO Relocate SERVER_ADDRESSES to separate file for improved security and editing
-SERVER_ADDRESSES = [ Address("127.0.0.1", 12345), Address("127.0.0.1", 12346), Address("127.0.0.1", 12347) ]
-#SERVER_ADDRESSES = [ Address("192.168.207.129", 12345), Address("192.168.207.130", 12346), Address("192.168.207.131", 12347) ]
-
 def create_logger(log_name: str) -> None:
     """
     Create logger from log config

@@ -10,7 +10,7 @@ from typing import NamedTuple
 from datetime import datetime
 from netifaces import interfaces, ifaddresses, AF_INET
 from project.src.ExceptionHandler import handle_exceptions
-from project.src.Shared import (Address, ACKNOWLEDGEMENT, FILEPATH,
+from project.src.Shared import (Address, ACKNOWLEDGEMENT, SERVER_INFO_PATH,
                                 FILE_DIRECTORY_PATH, create_logger,
                                 timing, receive, send)
 
@@ -74,8 +74,7 @@ class Server():
             Address | None: Server's address, if found
         """
         for interface in interfaces():
-            if interface == "lo":
-                continue
+            if interface == "lo": continue
 
             i = ifaddresses(interface).get(AF_INET)
             if i != None:
@@ -86,24 +85,30 @@ class Server():
 
         return None
 
-    # TODO Filesize threshold ~1GB
     # TODO After x lines, create new file. After creating N files, delete N - 1 files.
-    def _document_info(self, address: Address) -> None:
+    def _document_info(self, address: Address, filepath: str = SERVER_INFO_PATH) -> None:
         """
-        Document server's IP Address, port, number of cores, available RAM, OS, and timestamp to FILEPATH
+        Document server's IP Address, port, number of cores, available RAM, OS, and timestamp to SERVER_INFO_PATH
 
         Args:
             address (Address): Server's address
+            filepath (str, optional): Path of file to read from; defaults to SERVER_INFO_PATH
         """
-        # Newly created file will have no privileges initially revoked
+        # Append to file if < 1 GB; creates it if it does not exist or is empty
+        if not path.exists(filepath) or not path.isfile(filepath) or path.getsize(filepath) < 1000000000: mode = "a"
+
+        # Else, overwrite file if size >= 1 GB
+        else: mode = "w"
+
+        # File will have no privileges initially revoked
         # TODO If statement
         umask(0)
-        
+
         # Create and write permissions to file for all users
-        descriptor = opener(FILEPATH, flags = O_CREAT | O_WRONLY, mode = 0o777)
+        descriptor = opener(filepath, flags = O_CREAT | O_WRONLY, mode = 0o777)
         
         # Create file and write Server's IP Address, port, number of cores, available RAM, OS, and timestamp to file
-        with open(descriptor, "a") as file:
+        with open(descriptor, mode) as file:
             file.write(f"{address.ip} {address.port} {cpu_count()} {virtual_memory().available / 1000000000:.2f} {platform(terse = True)} {datetime.now()}\n")
 
         SERVER_LOGGER.info(f"Recorded information and timestamp for server at {address}\n")

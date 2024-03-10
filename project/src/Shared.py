@@ -40,7 +40,7 @@ LOG_PATH = path.join(FILE_DIRECTORY_PATH, "logging")
 MAX_NUM_FILES = 10
 """Maximum number of log files"""
 
-FILEPATH = path.join(FILE_DIRECTORY_PATH, "server_info", "server_info.txt")
+SERVER_INFO_PATH = path.join(FILE_DIRECTORY_PATH, "server_info", "server_info.txt")
 """Server info file path"""
 
 class Address(NamedTuple):

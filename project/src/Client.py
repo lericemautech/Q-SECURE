@@ -9,7 +9,7 @@ from time import perf_counter
 from logging import getLogger, shutdown
 from project.src.ExceptionHandler import handle_exceptions
 from project.src.Shared import (Address, ACKNOWLEDGEMENT, HORIZONTAL_PARTITIONS,
-                                FILEPATH, HEADERSIZE, LENGTH, VERTICAL_PARTITIONS,
+                                SERVER_INFO_PATH, HEADERSIZE, LENGTH, VERTICAL_PARTITIONS,
                                 create_logger, receive, send, generate_matrix, timing)
 
 MATRIX_B_WIDTH = 2
@@ -172,12 +172,12 @@ class Client():
 
         return data
 
-    def _read_file_reverse(self, filepath: str = FILEPATH) -> Iterator[str]:
+    def _read_file_reverse(self, filepath: str = SERVER_INFO_PATH) -> Iterator[str]:
         """
         Read file in reverse
 
         Args:
-            filepath (str, optional): Path of file to read from; defaults to FILEPATH
+            filepath (str, optional): Path of file to read from; defaults to SERVER_INFO_PATH
 
         Yields:
             Iterator[str]: Line(s) in file at filepath
@@ -200,9 +200,12 @@ class Client():
 
             if len(buffer) > 0: yield buffer.decode()[::-1]
 
-    def _get_available_servers(self) -> dict[Address, tuple[int, float]]:
+    def _get_available_servers(self, filepath: str = SERVER_INFO_PATH) -> dict[Address, tuple[int, float]]:
         """
         Get all active, listening servers and their CPU, available RAM
+
+        Args:
+            filepath (str, optional): Path of file to read from; defaults to SERVER_INFO_PATH
 
         Raises:
             FileNotFoundError: File containing server information does not exist
@@ -212,15 +215,15 @@ class Client():
             dict[Address, tuple[int, float]]: Dictionary of available servers and their CPU, available RAM
         """
         # Ensure file containing server information exists
-        if not path.exists(FILEPATH):
-            exception_msg = f"File at {FILEPATH} does not exist"
+        if not path.exists(filepath):
+            exception_msg = f"File at {filepath} does not exist"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise FileNotFoundError(exception_msg)
 
         # Ensure file containing server information is not empty
-        if path.getsize(FILEPATH) == 0:
-            exception_msg = f"File at {FILEPATH} is empty"
+        if path.getsize(filepath) == 0:
+            exception_msg = f"File at {filepath} is empty"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise IOError(exception_msg)

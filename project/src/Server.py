@@ -8,7 +8,6 @@ from psutil import virtual_memory
 from platform import platform
 from typing import NamedTuple
 from datetime import datetime
-from netifaces import interfaces, ifaddresses, AF_INET
 from project.src.ExceptionHandler import handle_exceptions
 from project.src.Shared import (Address, ACKNOWLEDGEMENT, SERVER_INFO_PATH,
                                 FILE_DIRECTORY_PATH, create_logger,
@@ -17,6 +16,8 @@ from project.src.Shared import (Address, ACKNOWLEDGEMENT, SERVER_INFO_PATH,
 # TODO Threading
 # TODO Fix logging for server(s)
 # https://docs.python.org/2/howto/logging-cookbook.html#sending-and-receiving-logging-events-across-a-network
+# TODO Pyfhel Client-Server demo
+# https://pyfhel.readthedocs.io/en/latest/_autoexamples/Demo_5_CS_Client.html#sphx-glr-autoexamples-demo-5-cs-client-py
 
 SERVER_LOGGER = getLogger(__name__)
 """Server logger"""
@@ -66,24 +67,17 @@ class Server():
         # Start server
         self._start_server(server_address)
 
-    def _get_address(self) -> Address | None:
+    def _get_address(self) -> Address:
         """
         Get server's IP Address and port
 
         Returns:
-            Address | None: Server's address, if found
+            Address: Server's address
         """
-        for interface in interfaces():
-            if interface == "lo": continue
-
-            i = ifaddresses(interface).get(AF_INET)
-            if i != None:
-                with socket() as sock:
-                    # Bind to open port provided by host
-                    sock.bind((i[0]["addr"], 0))
-                    return Address(sock.getsockname()[0], sock.getsockname()[1])
-
-        return None
+        with socket() as sock:
+            # Bind to open port
+            sock.bind(("", 0))
+            return Address(sock.getsockname()[0], sock.getsockname()[1])
 
     # TODO After x lines, create new file. After creating N files, delete N - 1 files.
     def _document_info(self, address: Address, filepath: str = SERVER_INFO_PATH) -> None:

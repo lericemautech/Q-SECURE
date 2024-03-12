@@ -1,4 +1,5 @@
 from socket import error
+from logging import shutdown
 
 def handle_exceptions(log):
     def decorator(func):
@@ -39,6 +40,9 @@ def handle_exceptions(log):
             except error as exception:
                 log.exception(exception)
                 raise error from exception
+
+            finally:
+                shutdown()
 
         return inner
 

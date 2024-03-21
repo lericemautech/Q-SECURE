@@ -1,13 +1,12 @@
 from socket import socket, SOL_SOCKET, SO_REUSEADDR
 from pickle import loads, dumps
-from numpy import ndarray, dot
 from os import O_CREAT, O_WRONLY, path, cpu_count, umask, open as opener
 from logging import getLogger, shutdown
 from time import perf_counter
 from psutil import virtual_memory
 from platform import platform
-from typing import NamedTuple
 from datetime import datetime
+from sympy import Matrix
 from project.src.ExceptionHandler import handle_exceptions
 from project.src.Shared import (Address, ACKNOWLEDGEMENT, SERVER_INFO_PATH,
                                 FILE_DIRECTORY_PATH, create_logger,
@@ -22,16 +21,6 @@ from project.src.Shared import (Address, ACKNOWLEDGEMENT, SERVER_INFO_PATH,
 SERVER_LOGGER = getLogger(__name__)
 """Server logger"""
 
-class Matrix(NamedTuple):
-    """
-    Tuple defining matrix and its position
-
-    Args:
-        NamedTuple (int, ndarray): Index and matrix
-    """
-    index: int
-    matrix: ndarray
-
 class Server():
     def __init__(self, directory_path: str = FILE_DIRECTORY_PATH):
         create_logger("server.log")
@@ -41,7 +30,7 @@ class Server():
         server_address: Address | None = self._get_address()
 
         # Check if address is valid (i.e. has IP Address and port)
-        if server_address == None or (server_address.ip or server_address.port) == None:
+        if (server_address or server_address.ip or server_address.port) == None:
             exception_msg = f"Unable to determine server's IP Address"
             SERVER_LOGGER.exception(exception_msg)
             shutdown()
@@ -107,27 +96,27 @@ class Server():
 
         SERVER_LOGGER.info(f"Recorded information and timestamp for server at {address}\n")
 
-    def _multiply(self, matrix_a: ndarray, matrix_b: ndarray, index: int) -> Matrix:
+    def _multiply(self, matrix_a: Matrix, matrix_b: Matrix, index: int) -> tuple[int, Matrix]:
         """
         Multiply 2 matrices using multithreading
 
         Args:
-            matrix_a (ndarray): Matrix A
-            matrix_b (ndarray): Matrix B
+            matrix_a (Matrix): Matrix A
+            matrix_b (Matrix): Matrix B
             index (int): Matrix position
 
         Returns:
-            Matrix: Position and multiple of Matrix A and Matrix B
+            tuple[int, Matrix]: Position and multiple of Matrix A and Matrix B
         """
         start = perf_counter()
 
         # Multiply matrices
-        product = Matrix(index, dot(matrix_a, matrix_b))
+        product = matrix_a.multiply(matrix_b)
 
         end = perf_counter()
         SERVER_LOGGER.info(f"Multiplied matrices in {timing(end, start)} seconds\n")
         
-        return product
+        return index, product
         
     def _send_client(self, client_socket: socket, data: bytes, server_address: Address) -> None:
         """
@@ -168,7 +157,7 @@ class Server():
         # Unpack data (i.e. partitions of Matrix A and Matrix B and their position)
         try:
             matrix_a_partition, matrix_b_partition, index = loads(data)
-            print(f"Received and unpacked [{index}]: {matrix_a_partition} and {matrix_b_partition}\n")
+            print(f"Received and unpacked [{index}]: {matrix_a_partition} and {matrix_b_partition}")
 
         # Catch error encountered when client is checking if server is listening
         except EOFError:

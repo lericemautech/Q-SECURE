@@ -1,12 +1,14 @@
 from collections.abc import Iterator
-from socket import socket, SOL_SOCKET, SO_REUSEADDR
+from socket import socket, error, SOL_SOCKET, SO_REUSEADDR
+from errno import EADDRINUSE, EADDRNOTAVAIL
 from pickle import loads, dumps
 from numpy import ndarray, random, array_split, concatenate, dot, shape, array_equal
 from queue import Queue
-from os import SEEK_END, path
+from os import path, SEEK_END
 from random import sample
 from time import perf_counter
 from logging import getLogger, shutdown
+from sympy import IndexedBase, Matrix, matrix2numpy
 from project.src.ExceptionHandler import handle_exceptions
 from project.src.Shared import (Address, ACKNOWLEDGEMENT, HORIZONTAL_PARTITIONS,
                                 SERVER_INFO_PATH, HEADERSIZE, LENGTH, VERTICAL_PARTITIONS,
@@ -15,10 +17,15 @@ from project.src.Shared import (Address, ACKNOWLEDGEMENT, HORIZONTAL_PARTITIONS,
 MATRIX_B_WIDTH = 2
 """Matrix B's width"""
 
+X = IndexedBase("x")
+"""Base of subscriptable variable used to replace elements in matrix"""
+
 CLIENT_LOGGER = getLogger(__name__)
 """Client logger"""
 
 # TODO Implement load balancer for client-servers
+# TODO Pyfhel Client-Server demo
+# https://pyfhel.readthedocs.io/en/latest/_autoexamples/Demo_5_CS_Client.html#sphx-glr-autoexamples-demo-5-cs-client-py
 
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray):
@@ -39,8 +46,33 @@ class Client():
         self._server_addresses: list[Address] = self._select_servers()
         CLIENT_LOGGER.info(f"Sending jobs to {self._server_addresses}\n")
 
+        # List to store elements (datatype equal to that of matrices) that have been replaced
+        self._replaced_elements: list[int] = [ ]
+
         # Create and queue partitions of Matrix A and Matrix B and their position, to be sent to selected server(s)
         self._partitions: Queue = self._queue_partitions(matrix_a, matrix_b)
+
+    def _randomly_replace(self, matrix: Matrix, index: int) -> tuple[Matrix, int]:
+        """
+        Replace random elements in matrix with a variable
+
+        Args:
+            matrix (Matrix): Matrix to be redacted
+            index (int): Position of replaced element (also number of elements replaced so far)
+
+        Returns:
+            tuple[Matrix, int]: Redacted matrix and index of most recently replaced element
+        """
+        mask = random.default_rng().choice([True, False], size = matrix.shape, shuffle = False)
+
+        for row in range(len(mask)):
+            for col in range(len(mask[0])):
+                if mask[row][col]:
+                    self._replaced_elements.append(matrix[row, col]) # type: ignore
+                    matrix[row, col] = X[index]
+                    index += 1
+
+        return matrix, index
 
     def _queue_partitions(self, matrix_a: ndarray, matrix_b: ndarray) -> Queue:
         """
@@ -63,15 +95,22 @@ class Client():
 
         # Declare queue to be populated and returned
         queue = Queue()
+
+        replaced_index = 0
         
         for i in range(len(matrix_a_partitions)):
-            # Have client compute some of the partitions; add 1 to num_servers to account for client
+            # Current subset of Matrix A and Matrix B
+            sub_matrix_a, sub_matrix_b = matrix_a_partitions[i], matrix_b_partitions[i % len(matrix_b_partitions)]
+            
+            # Have client compute some of the partitions (add 1 to account for client)
             if i % (len(self._server_addresses) + 1) == 0:
-                self._matrix_products[i] = dot(matrix_a_partitions[i], matrix_b_partitions[i % len(matrix_b_partitions)])
+                self._matrix_products[i] = dot(sub_matrix_a, sub_matrix_b)
 
             # ...while server(s) compute the rest
             else:
-                queue.put((matrix_a_partitions[i], matrix_b_partitions[i % len(matrix_b_partitions)], i))
+                # Replace random elements in Matrix A with a variable
+                redacted_matrix_a, replaced_index = self._randomly_replace(Matrix(sub_matrix_a), replaced_index)
+                queue.put((redacted_matrix_a, Matrix(sub_matrix_b), i))
 
         end = perf_counter()
         CLIENT_LOGGER.info(f"Created partitions and queue in {timing(end, start)} seconds\n")
@@ -127,6 +166,9 @@ class Client():
         end = perf_counter()
         CLIENT_LOGGER.info(f"Calculated final result in {timing(end, start)} seconds\n")
 
+        # Clean up
+        self._cleanup()
+        
         return result
 
     def _handle_server(self, server_socket: socket, data: bytes) -> bytes:
@@ -250,7 +292,7 @@ class Client():
 
         return available_servers
 
-    def _is_server_listening(self, server_address: Address) -> bool:
+    def _is_server_listening(self, server_address: Address) -> bool | None:
         """
         Check if server is listening
 
@@ -268,11 +310,14 @@ class Client():
                 sock.bind(server_address)
                 CLIENT_LOGGER.info(f"{server_address} is not listening\n")
                 return False
-
-            # Server is listening
-            except:
-                CLIENT_LOGGER.error(f"{server_address} is listening\n")
-                return True
+            
+            except error as exception:
+                error_num, _ = exception.args
+                
+                # Server is listening
+                if error_num in (EADDRINUSE, EADDRNOTAVAIL):
+                    CLIENT_LOGGER.info(f"{server_address} is listening\n")
+                    return True
 
     def _select_servers(self) -> list[Address]:
         """
@@ -332,6 +377,17 @@ class Client():
         CLIENT_LOGGER.info(f"Checked if servers have same CPU and available RAM in {timing(end, start)} seconds\n")
         
         return same_cpu, same_ram
+
+    def _cleanup(self) -> None:
+        """
+        Delete instance variables and shutdown logger
+        """
+        CLIENT_LOGGER.info("Cleaning up...\n")
+        del self._matrix_products
+        del self._server_addresses
+        del self._replaced_elements
+        del self._partitions
+        shutdown()
         
     @handle_exceptions(CLIENT_LOGGER)
     def _work(self) -> None:
@@ -379,8 +435,11 @@ class Client():
                         #print(f"Result Matrix from Server at {server_address} = {result}\n")
                         CLIENT_LOGGER.info(f"Successfully received valid result from Server at {server_address}\n")
 
-                        # Add result to dict, to be combined into final result later
-                        self._matrix_products[index] = result
+                        # Replace variables in result with their actual values
+                        actual_matrix = result.subs(X, tuple(self._replaced_elements)).doit()
+
+                        # Cast from SymPy Matrix to NumPy ndarray, then add to dict for concatenation later
+                        self._matrix_products[index] = matrix2numpy(actual_matrix, dtype = int)
 
                     else:
                         CLIENT_LOGGER.error(f"Failed to receive valid result from Server at {server_address}; retrying later...\n")
@@ -394,7 +453,6 @@ class Client():
             finally:
                 end_work = perf_counter()
                 CLIENT_LOGGER.info(f"Client worked for {timing(end_work, start_work)} seconds\n")
-                shutdown()
 
     def print_outcome(self, result: ndarray, check: ndarray) -> None:
         """

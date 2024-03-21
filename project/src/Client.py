@@ -470,20 +470,24 @@ class Client():
             print("INCORRECT CALCULATION...")
             exit(1)
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
     # Generate example matrices for testing
     matrix_a = generate_matrix(LENGTH, LENGTH)
     matrix_b = generate_matrix(LENGTH, MATRIX_B_WIDTH)
 
     print(f"Matrix A: {matrix_a}\n")
     print(f"Matrix B: {matrix_b}\n")
+    start = perf_counter()
 
     # Create Client to multiply matrices
     client = Client(matrix_a, matrix_b)
 
-    # Get result and print it
+    # Get result
     answer = client.get_result()
+
+    end = perf_counter()
     print(f"Final Result Matrix = {answer}\n")
+    print(f"Client ran for {end - start} seconds\n")
 
     # Print outcome (i.e. answer's correctness)
     client.print_outcome(answer, matrix_a @ matrix_b)

@@ -203,7 +203,7 @@ class Client():
         if acknowledgement_msg != ACKNOWLEDGEMENT:
             exception_msg = f"Invalid acknowledgment \"{acknowledgement_msg}\""
             CLIENT_LOGGER.exception(exception_msg)
-            shutdown()
+            self._cleanup()
             raise ValueError(exception_msg)
                             
         # Receive data from server
@@ -260,14 +260,14 @@ class Client():
         if not path.exists(filepath):
             exception_msg = f"File at {filepath} does not exist"
             CLIENT_LOGGER.exception(exception_msg)
-            shutdown()
+            self._cleanup()
             raise FileNotFoundError(exception_msg)
 
         # Ensure file containing server information is not empty
         if path.getsize(filepath) == 0:
             exception_msg = f"File at {filepath} is empty"
             CLIENT_LOGGER.exception(exception_msg)
-            shutdown()
+            self._cleanup()
             raise IOError(exception_msg)
 
         available_servers = { }

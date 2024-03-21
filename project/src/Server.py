@@ -33,21 +33,21 @@ class Server():
         if (server_address or server_address.ip or server_address.port) == None:
             exception_msg = f"Unable to determine server's IP Address"
             SERVER_LOGGER.exception(exception_msg)
-            shutdown()
+            self._cleanup()
             raise ValueError(exception_msg)
 
         # Check if directory_path exists
         if not path.exists(directory_path):
             exception_msg = f"{directory_path} does not exist"
             SERVER_LOGGER.exception(exception_msg)
-            shutdown()
+            self._cleanup()
             raise IOError(exception_msg)
 
         # Check if directory_path is actually a directory
         if not path.isdir(directory_path):
             exception_msg = f"{directory_path} is not a directory"
             SERVER_LOGGER.exception(exception_msg)
-            shutdown()
+            self._cleanup()
             raise NotADirectoryError(exception_msg)
 
         # Document server info
@@ -178,6 +178,13 @@ class Server():
         end = perf_counter()
         SERVER_LOGGER.info(f"Successfully handled client in {timing(end, start)} second(s)\n")
 
+    def _cleanup(self) -> None:
+        """
+        Shutdown logger
+        """
+        SERVER_LOGGER.info("Shutting down logger...\n")
+        shutdown()
+
     @handle_exceptions(SERVER_LOGGER)
     def _start_server(self, server_address: Address) -> None:
         """
@@ -224,4 +231,4 @@ class Server():
         finally:
             end = perf_counter()
             SERVER_LOGGER.info(f"Server at {server_address} ran for {timing(end, start)} seconds")
-            shutdown()
+            self._cleanup()

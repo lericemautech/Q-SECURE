@@ -16,10 +16,10 @@ LENGTH = 32
 SIG_FIGS = 5
 """Number of significant figures in timing"""
 
-HORIZONTAL_PARTITIONS = 16
+HORIZONTAL_PARTITIONS = 14
 """Number of horizontal partitions in matrix"""
 
-VERTICAL_PARTITIONS = 2
+VERTICAL_PARTITIONS = 3
 """Number of vertical partitions in matrix"""
 
 BUFFER = 4096
@@ -120,15 +120,16 @@ def timing(end: float, start: float) -> float:
     """
     return round(end - start, SIG_FIGS)
 
-def generate_matrix(length: int, width: int) -> ndarray:
+def generate_matrix(length: int, width: int = -1) -> ndarray:
     """
     Generates a random matrix of size length * width
 
     Args:
         length (int): Length of matrix
-        width (int): Width of matrix
+        width (int, optional): Width of matrix; defaults to length
 
     Returns:
         ndarray: Random matrix of size length * width
     """
+    if width == -1: width = length
     return random.randint(MIN, MAX, size = (length, width), dtype = int)

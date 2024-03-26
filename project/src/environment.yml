@@ -2,7 +2,7 @@ name: q-secure_env
 channels:
   - defaults
 dependencies:
-  - python=3.11.8
+  - python=3.12.2
   - numpy=1.26.4
   - pip:
     - sympy==1.12

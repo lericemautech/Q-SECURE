@@ -6,3 +6,4 @@ dependencies:
   - numpy=1.26.4
   - pip:
     - sympy==1.12
+    - psutil==5.9.8

@@ -15,8 +15,6 @@ from project.src.Shared import (Address, ACKNOWLEDGEMENT, SERVER_INFO_PATH,
 # TODO Threading
 # TODO Fix logging for server(s)
 # https://docs.python.org/2/howto/logging-cookbook.html#sending-and-receiving-logging-events-across-a-network
-# TODO Pyfhel Client-Server demo
-# https://pyfhel.readthedocs.io/en/latest/_autoexamples/Demo_5_CS_Client.html#sphx-glr-autoexamples-demo-5-cs-client-py
 
 SERVER_LOGGER = getLogger(__name__)
 """Server logger"""

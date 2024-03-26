@@ -2,7 +2,7 @@ from collections.abc import Iterator
 from socket import socket, error, SOL_SOCKET, SO_REUSEADDR
 from errno import EADDRINUSE, EADDRNOTAVAIL
 from pickle import loads, dumps
-from numpy import ndarray, random, array_split, concatenate, dot, shape, array_equal
+from numpy import ndarray, random, array_split, concatenate, dot, array_equal
 from queue import Queue
 from os import path, SEEK_END
 from random import sample
@@ -14,7 +14,7 @@ from project.src.Shared import (Address, ACKNOWLEDGEMENT, HORIZONTAL_PARTITIONS,
                                 SERVER_INFO_PATH, HEADERSIZE, LENGTH, VERTICAL_PARTITIONS,
                                 create_logger, receive, send, generate_matrix, timing)
 
-MATRIX_B_WIDTH = 2
+MATRIX_B_WIDTH = 4
 """Matrix B's width"""
 
 X = IndexedBase("x")
@@ -23,18 +23,21 @@ X = IndexedBase("x")
 CLIENT_LOGGER = getLogger(__name__)
 """Client logger"""
 
-# TODO Implement load balancer for client-servers
-# TODO Pyfhel Client-Server demo
-# https://pyfhel.readthedocs.io/en/latest/_autoexamples/Demo_5_CS_Client.html#sphx-glr-autoexamples-demo-5-cs-client-py
-
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray):
         create_logger("client.log")
         CLIENT_LOGGER.info("Starting Client...\n")
 
+        # Ensure Matrix length is not smaller than number of horizontal and/or vertical partitions
+        if LENGTH < (HORIZONTAL_PARTITIONS or VERTICAL_PARTITIONS):
+            exception_msg = f"Matrix length ({LENGTH}) cannot be smaller than number of horizontal ({HORIZONTAL_PARTITIONS}) and/or vertical ({VERTICAL_PARTITIONS}) partitions"
+            CLIENT_LOGGER.exception(exception_msg)
+            shutdown()
+            raise ValueError(exception_msg)
+
         # Ensure Matrix B's width is not smaller than number of vertical partitions
-        if MATRIX_B_WIDTH < VERTICAL_PARTITIONS:
-            exception_msg = f"Matrix B's width ({MATRIX_B_WIDTH}) cannot be smaller than number of vertical partitions ({VERTICAL_PARTITIONS})"
+        elif MATRIX_B_WIDTH < VERTICAL_PARTITIONS:
+            exception_msg = f"Matrix B's width ({MATRIX_B_WIDTH}) cannot be smaller than number of vertical ({VERTICAL_PARTITIONS}) partitions"
             CLIENT_LOGGER.exception(exception_msg)
             shutdown()
             raise ValueError(exception_msg)
@@ -90,9 +93,9 @@ class Client():
         # Split matrix horizontally
         sub_matrices = array_split(matrix_a, HORIZONTAL_PARTITIONS, axis = 0)
 
-        # Split submatrices vertically
+        # Split submatrices vertically and split Matrix B horizontally using VERTICAL_PARTITIONS (i.e., Matrix A's vertical partitions width should equal Matrix B's horizontal partitions length)
         matrix_a_partitions, matrix_b_partitions = [m for sub_matrix in sub_matrices for m in  array_split(sub_matrix, VERTICAL_PARTITIONS, axis = 1)], array_split(matrix_b, VERTICAL_PARTITIONS, axis = 0)
-
+        
         # Declare queue to be populated and returned
         queue = Queue()
 
@@ -100,8 +103,8 @@ class Client():
         
         for i in range(len(matrix_a_partitions)):
             # Current subset of Matrix A and Matrix B
-            sub_matrix_a, sub_matrix_b = matrix_a_partitions[i], matrix_b_partitions[i % len(matrix_b_partitions)]
-            
+            sub_matrix_a, sub_matrix_b = matrix_a_partitions[i], matrix_b_partitions[i % VERTICAL_PARTITIONS]
+
             # Have client compute some of the partitions (add 1 to account for client)
             if i % (len(self._server_addresses) + 1) == 0:
                 self._matrix_products[i] = dot(sub_matrix_a, sub_matrix_b)
@@ -132,12 +135,12 @@ class Client():
         # Get all results from the queue, sorted by its position
         results = [value for _, value in sorted(matrix_products.items())]
 
-        # Number of columns, end index, and list for storing combined results
-        num_columns, end, combined_results = shape(results[0])[1], 0, []
+        # End index and list for storing combined results
+        end, combined_results = 0, []
 
         # Sum all values in the same row, then add to combined_results
-        for i in range(0, len(results), num_columns):
-            end += num_columns
+        for i in range(0, len(results), VERTICAL_PARTITIONS):
+            end += VERTICAL_PARTITIONS
             combined_results.append(sum(results[i:end]))
 
         # Combine all results into a single matrix
@@ -420,6 +423,7 @@ class Client():
 
                     # Get partitions to send to server
                     partitions = self._partitions.get(timeout = 0.1)
+                    #print(f"Sending to server: {partitions}\n")
 
                     # Receive result from server
                     data = self._handle_server(sock, dumps(partitions))
@@ -432,14 +436,28 @@ class Client():
 
                     # Check if result and index was received (i.e. not None)
                     if result is not None:
-                        #print(f"Result Matrix from Server at {server_address} = {result}\n")
                         CLIENT_LOGGER.info(f"Successfully received valid result from Server at {server_address}\n")
+                        #print(f"Redacted result Matrix from Server at {server_address} = {result}\n")
+
+                        # Start timer
+                        start = perf_counter()
 
                         # Replace variables in result with their actual values
                         actual_matrix = result.subs(X, tuple(self._replaced_elements)).doit()
 
+                        # End timer
+                        end = perf_counter()
+                        CLIENT_LOGGER.info(f"Replaced variables in result with their actual values in {timing(end, start)} seconds\n")
+
+                        # Start timer
+                        start = perf_counter()
+                        
                         # Cast from SymPy Matrix to NumPy ndarray, then add to dict for concatenation later
                         self._matrix_products[index] = matrix2numpy(actual_matrix, dtype = int)
+
+                        # End timer
+                        end = perf_counter()
+                        CLIENT_LOGGER.info(f"Converted SymPy Matrix to NumPy ndarray in {timing(end, start)} seconds\n")
 
                     else:
                         CLIENT_LOGGER.error(f"Failed to receive valid result from Server at {server_address}; retrying later...\n")
@@ -468,6 +486,7 @@ class Client():
 
         else:
             print("INCORRECT CALCULATION...")
+            print(f"\nCorrect Answer = {check}\n")
             exit(1)
 
 if __name__ == "__main__":

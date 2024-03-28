@@ -1,12 +1,16 @@
 # This file is used to test the code in the src folder
 from timeit import timeit
+from numpy import random, ndarray
 from project.src.Shared import generate_matrix
 
 SHOTS = 1000
 SIG_FIGS = 5
-LENGTH = 8
+LENGTH = 4
 HORIZONTAL_PARTITIONS = 2
 VERTICAL_PARTITIONS = 2
+N_REPLACE = 6
+MIN = 0
+MAX = 100
 
 def timing(func: str, setup: str, sims: int = SHOTS) -> float:
     """
@@ -53,10 +57,50 @@ def simulations() -> None:
     elif minimum == m_time: print("\nMatmul is %f ms faster than calculate_result()" % round(abs(c_time - m_time), SIG_FIGS))
     else: print("\ncalculate_result() is the fastest calculation!")
 
+def generate_matrix(length: int, width: int) -> ndarray:
+    """
+    Generates a random matrix of size length * width
+
+    Args:
+        length (int): Length of matrix
+        width (int): Width of matrix
+
+    Returns:
+        ndarray: Random matrix of size length * width
+    """
+    return random.randint(MIN, MAX, size = (length, width), dtype = int)
+
 if __name__ == "__main__":
     m1 = generate_matrix(LENGTH, LENGTH)
-    m2 = generate_matrix(LENGTH, 3)
+    m2 = generate_matrix(LENGTH, 2)
 
-    from psutil import virtual_memory
+    # read, write, _ = select(server_sockets, server_sockets, [])
+    # if len(read) != 0:
+        
+    #     data = receive(server_sockets[0])
+    #     index, result = loads(data)
+    #     if result is not None:
+    #         self._matrix_products[index] = result
 
-    print(f"{virtual_memory().available / 1000000000:.2f} GB")
+    #     else:
+    #         self._partitions.put(partitions)
+
+    #     # for sock in read:
+    #     #     data = self._handle_server(sock, dumps(self._partitions.get()))
+
+    # if len(write) != 0:
+    #     for sock in write:
+    #         # Get partitions to send to server
+    #         partitions = self._partitions.get(timeout = 0.1)
+
+    #         send(sock, dumps(partitions))
+
+    #         # Receive acknowledgment from server
+    #         acknowledgement_data = sock.recv(HEADERSIZE)
+
+    #         # Verify acknowledgment
+    #         acknowledgement_length = int(acknowledgement_data.decode("utf-8").strip())
+    #         acknowledgement_msg = sock.recv(acknowledgement_length).decode("utf-8").strip()
+    #         if acknowledgement_msg != ACKNOWLEDGEMENT:
+    #             shutdown()
+    #             raise ValueError()

@@ -19,7 +19,7 @@ from project.src.Shared import (Address, ACKNOWLEDGEMENT, SERVER_INFO_PATH,
 SERVER_LOGGER = getLogger(__name__)
 """Server logger"""
 
-class Server():
+class EncryptedServer():
     def __init__(self, directory_path: str = FILE_DIRECTORY_PATH):
         create_logger("server.log")
         SERVER_LOGGER.info("Starting Server...\n")

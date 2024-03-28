@@ -23,6 +23,8 @@ X = IndexedBase("x")
 CLIENT_LOGGER = getLogger(__name__)
 """Client logger"""
 
+# TODO Threading in Client where there's 1 thread for each Server connection
+
 class Client():
     def __init__(self, matrix_a: ndarray, matrix_b: ndarray):
         create_logger("client.log")
@@ -391,8 +393,20 @@ class Client():
         del self._replaced_elements
         del self._partitions
         shutdown()
+
+    def ree(self):
+        clients = [ ]
+        
+        for server in self._server_addresses:
+            client = socket()
+            client.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+            client.connect(server)
+            clients.append(client)
+
+        return clients
         
     @handle_exceptions(CLIENT_LOGGER)
+    # TODO Create separate client instances for each server
     def _work(self) -> None:
         """
         Send partitioned matrices to server(s), get results,
@@ -403,67 +417,70 @@ class Client():
 
         start_work = perf_counter()
 
+        clients = self.ree()
+
         # While there's still partitions to send to server(s)
         while not self._partitions.empty():
             try:
-                with socket() as sock:
+                sock = clients[i % len(clients)]
+                #with socket() as sock:
                     # Allow reuse of address
-                    sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+                    #sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
 
                     # Address of server
-                    server_address = self._server_addresses[i % len(self._server_addresses)]
+                    #server_address = self._server_addresses[i % len(self._server_addresses)]
+
+                    # Start timer
+                start = perf_counter()
+
+                    # Connect to server
+                    #sock.connect(server_address)
+                connection_timer = perf_counter()
+                #CLIENT_LOGGER.info(f"Client connected to Server at {server_address} in {timing(connection_timer, start)} seconds\n")
+
+                # Get partitions to send to server
+                partitions = self._partitions.get(timeout = 0.1)
+                #print(f"Sending to server: {partitions}\n")
+
+                # Receive result from server
+                data = self._handle_server(sock, dumps(partitions))
+                
+                # Unpack data (i.e. position and product of partitions) from server
+                index, result = loads(data)
+
+                end = perf_counter()
+                #CLIENT_LOGGER.info(f"Client connected, sent, received, and unpacked data from Server at {server_address} in {timing(end, start)} seconds\n")
+
+                # Check if result and index was received (i.e. not None)
+                if result is not None:
+                    #CLIENT_LOGGER.info(f"Successfully received valid result from Server at {server_address}\n")
+                    #print(f"Redacted result Matrix from Server at {server_address} = {result}\n")
 
                     # Start timer
                     start = perf_counter()
 
-                    # Connect to server
-                    sock.connect(server_address)
-                    connection_timer = perf_counter()
-                    CLIENT_LOGGER.info(f"Client connected to Server at {server_address} in {timing(connection_timer, start)} seconds\n")
+                    # Replace variables in result with their actual values
+                    actual_matrix = result.subs(X, tuple(self._replaced_elements)).doit()
 
-                    # Get partitions to send to server
-                    partitions = self._partitions.get(timeout = 0.1)
-                    #print(f"Sending to server: {partitions}\n")
-
-                    # Receive result from server
-                    data = self._handle_server(sock, dumps(partitions))
-                    
-                    # Unpack data (i.e. position and product of partitions) from server
-                    index, result = loads(data)
-
+                    # End timer
                     end = perf_counter()
-                    CLIENT_LOGGER.info(f"Client connected, sent, received, and unpacked data from Server at {server_address} in {timing(end, start)} seconds\n")
+                    CLIENT_LOGGER.info(f"Replaced variables in result with their actual values in {timing(end, start)} seconds\n")
 
-                    # Check if result and index was received (i.e. not None)
-                    if result is not None:
-                        CLIENT_LOGGER.info(f"Successfully received valid result from Server at {server_address}\n")
-                        #print(f"Redacted result Matrix from Server at {server_address} = {result}\n")
+                    # Start timer
+                    start = perf_counter()
+                    
+                    # Cast from SymPy Matrix to NumPy ndarray, then add to dict for concatenation later
+                    self._matrix_products[index] = matrix2numpy(actual_matrix, dtype = int)
 
-                        # Start timer
-                        start = perf_counter()
+                    # End timer
+                    end = perf_counter()
+                    CLIENT_LOGGER.info(f"Converted SymPy Matrix to NumPy ndarray in {timing(end, start)} seconds\n")
 
-                        # Replace variables in result with their actual values
-                        actual_matrix = result.subs(X, tuple(self._replaced_elements)).doit()
+                else:
+                    #CLIENT_LOGGER.error(f"Failed to receive valid result from Server at {server_address}; retrying later...\n")
 
-                        # End timer
-                        end = perf_counter()
-                        CLIENT_LOGGER.info(f"Replaced variables in result with their actual values in {timing(end, start)} seconds\n")
-
-                        # Start timer
-                        start = perf_counter()
-                        
-                        # Cast from SymPy Matrix to NumPy ndarray, then add to dict for concatenation later
-                        self._matrix_products[index] = matrix2numpy(actual_matrix, dtype = int)
-
-                        # End timer
-                        end = perf_counter()
-                        CLIENT_LOGGER.info(f"Converted SymPy Matrix to NumPy ndarray in {timing(end, start)} seconds\n")
-
-                    else:
-                        CLIENT_LOGGER.error(f"Failed to receive valid result from Server at {server_address}; retrying later...\n")
-
-                        # Put partitions back into queue (since it was previously removed via .get()), to try again later
-                        self._partitions.put(partitions)
+                    # Put partitions back into queue (since it was previously removed via .get()), to try again later
+                    self._partitions.put(partitions)
 
                     # Increment index
                     i += 1

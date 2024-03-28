@@ -1,4 +1,4 @@
-from project.src.Server import Server as Server
+from project.src.server.EncryptedServer import EncryptedServer
 
 if __name__ == "__main__":
-    Server()
+    EncryptedServer()

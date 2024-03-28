@@ -2,6 +2,7 @@ from socket import socket
 from typing import NamedTuple
 from numpy import ndarray, random
 from os import getcwd, path
+from logging import Logger, shutdown
 from logging.config import fileConfig
 
 MIN = 0
@@ -10,16 +11,16 @@ MIN = 0
 MAX = 5
 """Largest value in matrix"""
 
-LENGTH = 32
+LENGTH = 8
 """Matrix size"""
 
 SIG_FIGS = 5
 """Number of significant figures in timing"""
 
-HORIZONTAL_PARTITIONS = 14
+HORIZONTAL_PARTITIONS = 2
 """Number of horizontal partitions in matrix"""
 
-VERTICAL_PARTITIONS = 3
+VERTICAL_PARTITIONS = 2
 """Number of vertical partitions in matrix"""
 
 BUFFER = 4096
@@ -133,3 +134,13 @@ def generate_matrix(length: int, width: int = -1) -> ndarray:
     """
     if width == -1: width = length
     return random.randint(MIN, MAX, size = (length, width), dtype = int)
+
+def cleanup(logger: Logger) -> None:
+    """
+    Shutdown logger
+
+    Args:
+        logger (Logger): Logger
+    """
+    logger.info("Shutting down logger...\n")
+    shutdown()

@@ -6,8 +6,7 @@ from socket import socket, error, SOL_SOCKET, SO_REUSEADDR
 from collections.abc import Iterator
 from errno import EADDRINUSE, EADDRNOTAVAIL
 from os import path, SEEK_END
-from logging import shutdown
-from project.src.Shared import (timing, send, receive, Address, ACKNOWLEDGEMENT, HORIZONTAL_PARTITIONS,
+from project.src.Shared import (timing, send, receive, cleanup, Address, ACKNOWLEDGEMENT, HORIZONTAL_PARTITIONS,
                                 VERTICAL_PARTITIONS, HEADERSIZE, SERVER_INFO_PATH)
 
 MATRIX_B_WIDTH = 4
@@ -29,14 +28,14 @@ def validate_inputs(length: int, matrix_b_width: int, logger: Logger) -> None:
     if length < (HORIZONTAL_PARTITIONS or VERTICAL_PARTITIONS):
         exception_msg = f"Matrix length ({length}) cannot be smaller than number of horizontal ({HORIZONTAL_PARTITIONS}) and/or vertical ({VERTICAL_PARTITIONS}) partitions"
         logger.exception(exception_msg)
-        shutdown()
+        cleanup(logger)
         raise ValueError(exception_msg)
 
     # Ensure Matrix B's width is not smaller than number of vertical partitions
     elif matrix_b_width < VERTICAL_PARTITIONS:
         exception_msg = f"Matrix B's width ({matrix_b_width}) cannot be smaller than number of vertical ({VERTICAL_PARTITIONS}) partitions"
         logger.exception(exception_msg)
-        shutdown()
+        cleanup(logger)
         raise ValueError(exception_msg)
 
 def combine_results(matrix_products: dict[int, ndarray], logger: Logger) -> ndarray:

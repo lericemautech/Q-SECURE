@@ -1,6 +1,6 @@
 <div align="center">
 <h1>Q-SECURE: Quantum-Secure Protocol</h1>
-<img alt="Python" src="https://img.shields.io/static/v1?label=Language&style=flat&message=Python+3.11.8&logo=python&color=c7a228&labelColor=393939&logoColor=c7a228">
+<img alt="Python" src="https://img.shields.io/static/v1?label=Language&style=flat&message=Python+3.12.2&logo=python&color=c7a228&labelColor=393939&logoColor=c7a228">
 <img alt="Git" src="https://img.shields.io/static/v1?label=Version+Control&style=flat&message=Git&logo=git&color=f05032&labelColor=393939&logoColor=f05032">
 <img alt="SymPy" src="https://img.shields.io/static/v1?label=Package&style=flat&message=SymPy&logo=sympy&color=9582b3&labelColor=393939&logoColor=9582b3">
 <img alt="NumPy" src="https://img.shields.io/static/v1?label=Package&style=flat&message=NumPy&logo=numpy&color=4d707b&labelColor=393939&logoColor=4d707b">

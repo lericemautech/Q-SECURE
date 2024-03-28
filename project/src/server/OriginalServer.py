@@ -39,10 +39,10 @@ class OriginalServer():
         document_info(server_address, SERVER_LOGGER)
 
         # Start server
-        self._start_unencrypted_server(server_address, SERVER_LOGGER)
+        self._start_original_server(server_address, SERVER_LOGGER)
 
     @handle_exceptions(SERVER_LOGGER)
-    def _start_unencrypted_server(self, server_address: Address, logger: Logger) -> None:
+    def _start_original_server(self, server_address: Address, logger: Logger) -> None:
         """
         Start Original Server
 

@@ -9,34 +9,54 @@
 
 ## Requirements
 - [x] [Anaconda](https://docs.continuum.io/free/anaconda/install) **OR** [Miniconda](https://docs.conda.io/projects/miniconda/en/latest)
-> [!NOTE]
-> If you have trouble deciding between Anaconda and Miniconda, please refer to the table below
+> [!TIP]
+> If you have trouble deciding between Anaconda and Miniconda, please refer to the table below:
 > <table>
-> <thead>
-> <tr>
-> <th><center>Anaconda</center></th>
-> <th><center>Miniconda</center></th>
-> </tr>
-> </thead>
-> <tbody>
-> <tr>
-> <td>New to conda and/or Python</td>
-> <td>Familiar with conda and/or Python</td>
-> </tr>
-> <tr>
-> <td>Like the convenience of having Python and 1,500+ scientific packages automatically installed at once</td>
-> <td>Want fast access to Python and the conda commands and plan to sort out the other programs later</td>
-> </tr>
-> <tr>
-> <td>Have the time and space (a few minutes and 3 GB)</td>
-> <td>Don't have the time or space to install 1,500+ packages</td>
-> </tr>
-> <tr>
-> <td>Don't want to individually install each package</td>
-> <td>Don't mind individually installing each package</td>
-> </tr>
-> </tbody>
+>  <thead>
+>   <tr>
+>    <th><center>Anaconda</center></th>
+>    <th><center>Miniconda</center></th>
+>   </tr>
+>  </thead>
+>  <tbody>
+>   <tr>
+>    <td>New to conda and/or Python</td>
+>    <td>Familiar with conda and/or Python</td>
+>   </tr>
+>   <tr>
+>    <td>Not familiar with using terminal and prefer GUI</td>
+>    <td>Comfortable using terminal</td>
+>   </tr>
+>   <tr>
+>    <td>Like the convenience of having Python and 1,500+ scientific packages automatically installed at once</td>
+>    <td>Want fast access to Python and the conda commands and plan to sort out the other programs later</td>
+>   </tr>
+>   <tr>
+>    <td>Have the time and space (a few minutes and 3 GB)</td>
+>    <td>Don't have the time or space to install 1,500+ packages</td>
+>   </tr>
+>   <tr>
+>    <td>Don't want to individually install each package</td>
+>    <td>Don't mind individually installing each package</td>
+>   </tr>
+>  </tbody>
 > </table>
+>
+> Typing out entire Conda commands can sometimes be tedious, so I wrote a shell script ([`conda_shortcuts.sh` on GitHub Gist](https://gist.github.com/lynkos/7a4ce7f9e38bb56174360648461a3dc8)) to define shortcuts for commonly used Conda commands.
+> <details>
+>   <summary>Example: Delete/remove a conda environment named <code>test_env</code></summary>
+>
+> * Shortcut command
+>     ```
+>     rmenv test_env
+>     ```
+> * Manually typing out the entire command
+>     ```sh
+>     conda env remove -n test_env && rm -rf $(conda info --base)/envs/test_env
+>     ```
+>
+> The shortcut has 80.8% fewer characters!
+> </details>
 
 ## Usage
 1. Verify that conda is installed
@@ -81,40 +101,14 @@
        ```
        conda env list
        ```
-8. Run the 1st server within `Q-SECURE` directory
-    * UNIX
-        ```
-        $(which python) -m project.test.TestServer1
-        ```
-    * Windows
-        ```
-        $(where python) -m project.test.TestServer1
-        ```
-9. Run the 2nd server within `Q-SECURE` directory
-    * UNIX
-        ```
-        $(which python) -m project.test.TestServer2
-        ```
-    * Windows
-        ```
-        $(where python) -m project.test.TestServer2
-        ```
-10. Run the 3rd server within `Q-SECURE` directory
-    * UNIX
-        ```
-        $(which python) -m project.test.TestServer3
-        ```
-    * Windows
-        ```
-        $(where python) -m project.test.TestServer3
-        ```
-11. Run the client within `Q-SECURE` directory
-    * UNIX
-        ```
-        $(which python) -m project.src.Client
-        ```
-    * Windows
-        ```
-        $(where python) -m project.src.Client
-        ```
-12. Press `CTRL + C` in the terminal running each server to disconnect
+8. Run the 1st, 2nd, and 3rd servers within `Q-SECURE` directory
+   ```
+   python -m project.test.TestServer1
+   python -m project.test.TestServer2
+   python -m project.test.TestServer3
+   ```
+9. Run the client within `Q-SECURE` directory
+      ```
+      python -m project.src.Client
+      ```
+10. Press `CTRL + C` in the terminal running each server to disconnect

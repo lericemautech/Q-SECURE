@@ -1,10 +1,10 @@
 <div align="center">
-<h1>Q-SECURE: Quantum-Secure Protocol</h1>
-<img alt="Python" src="https://img.shields.io/static/v1?label=Language&style=flat&message=Python+3.12.2&logo=python&color=c7a228&labelColor=393939&logoColor=c7a228">
-<img alt="Git" src="https://img.shields.io/static/v1?label=Version+Control&style=flat&message=Git&logo=git&color=f05032&labelColor=393939&logoColor=f05032">
-<img alt="SymPy" src="https://img.shields.io/static/v1?label=Package&style=flat&message=SymPy&logo=sympy&color=9582b3&labelColor=393939&logoColor=9582b3">
-<img alt="NumPy" src="https://img.shields.io/static/v1?label=Package&style=flat&message=NumPy&logo=numpy&color=4d707b&labelColor=393939&logoColor=4d707b">
-<img alt="Anaconda" src="https://img.shields.io/static/v1?label=Package+Manager&style=flat&message=Conda&logo=anaconda&color=44a833&labelColor=393939&logoColor=44a833">
+   <h1>Q-SECURE: Quantum-Secure Protocol</h1>
+   <img alt="Python" src="https://img.shields.io/static/v1?label=Language&style=flat&message=Python+3.12.2&logo=python&color=c7a228&labelColor=393939&logoColor=c7a228">
+   <img alt="Git" src="https://img.shields.io/static/v1?label=Version+Control&style=flat&message=Git&logo=git&color=f05032&labelColor=393939&logoColor=f05032">
+   <img alt="SymPy" src="https://img.shields.io/static/v1?label=Package&style=flat&message=SymPy&logo=sympy&color=9582b3&labelColor=393939&logoColor=9582b3">
+   <img alt="NumPy" src="https://img.shields.io/static/v1?label=Package&style=flat&message=NumPy&logo=numpy&color=4d707b&labelColor=393939&logoColor=4d707b">
+   <img alt="Anaconda" src="https://img.shields.io/static/v1?label=Package+Manager&style=flat&message=Conda&logo=anaconda&color=44a833&labelColor=393939&logoColor=44a833">
 </div>
 
 ## Requirements
@@ -112,3 +112,14 @@
       python -m project.src.Client
       ```
 10. Press `CTRL + C` in the terminal running each server to disconnect
+
+## System Design
+Multi-party computation (MPC), a quantum-resistant cryptographic algorithm, implementation to securely compute the product of `N` matrices
+1. Split each of `N` matrices into submatrices
+2. Homomorphically encrypt the submatrices and disperse evenly among `M` Internet of Things (IoT) devices
+3. `M` IoT devices calculate the product of `N` homomorphically encrypted submatrices and send the result back upon completion
+4. Received submatrices (i.e. results) are decrypted and concatenated into a single matrix, which is the final result
+
+<div align="center">
+   <img alt="MPC System Design" src="https://media.licdn.com/dms/image/v2/D4E2DAQEm3J4NVypV1Q/profile-treasury-image-shrink_800_800/profile-treasury-image-shrink_800_800/0/1723823236619?e=1724428800&v=beta&t=g5L7EZ_4hHJc2qbV9pGKdI8-0MIGNdHIaj3nU4JqSqc">
+</div>

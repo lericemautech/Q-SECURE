@@ -60,32 +60,32 @@
 
 ## Usage
 1. Verify that conda is installed
-   ```
+   ```sh
    conda --version
    ```
 2. Ensure conda is up to date
-   ```
+   ```sh
    conda update conda
    ```
 3. Enter the the directory where you want the repository (`Q-SECURE`) to be cloned
     * UNIX
-        ```
+        ```sh
         cd ~/path/to/directory
         ```
     * Windows
-        ```
+        ```sh
         cd C:\path\to\directory
         ```
 4. Clone the repository, then enter its directory
-    ```
+    ```sh
     git clone https://github.com/lericemautech/Q-SECURE.git && cd Q-SECURE
     ```
 5. Create a conda virtual environment from `environment.yml`
-   ```
+   ```sh
    conda env create -f environment.yml
    ```
 6. Activate the virtual environment (`q-secure_env`)
-   ```
+   ```sh
    conda activate q-secure_env
    ```
 7. Confirm that the virtual environment (`q-secure_env`) is active
@@ -94,23 +94,23 @@
        (q-secure_env) $
        ```
      * If necessary, see which environments are available and/or currently active (active environment denoted with asterisk (*))
-       ```
+       ```sh
        conda info --envs
        ```
        **OR**
-       ```
+       ```sh
        conda env list
        ```
 8. Run the 1st, 2nd, and 3rd servers within `Q-SECURE` directory
-   ```
+   ```py
    python -m project.test.TestServer1
    python -m project.test.TestServer2
    python -m project.test.TestServer3
    ```
 9. Run the client within `Q-SECURE` directory
-      ```
-      python -m project.src.Client
-      ```
+   ```py
+   python -m project.src.Client
+   ```
 10. Press `CTRL + C` in the terminal running each server to disconnect
 
 ## System Design

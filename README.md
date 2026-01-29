@@ -115,11 +115,11 @@
 10. Press `CTRL + C` in the terminal running each server to disconnect
 
 ## System Design
+<div align="center">
+   <img alt="MPC System Design" src="https://lynkos.dev/assets/img/misc/mpc.webp">
+</div>
+
 1. Split each of `N` massive matrices into submatrices
 2. Homomorphically encrypt the submatrices and disperse evenly among `M` Internet of Things (IoT) devices
 3. `M` IoT devices calculate the product of `N` homomorphically encrypted submatrices and send the result back upon completion
 4. Received submatrices (i.e. results) are decrypted and concatenated into a single matrix, which is the final result
-
-<div align="center">
-   <img alt="MPC System Design" src="https://lynkos.dev/assets/img/misc/mpc.webp">
-</div>

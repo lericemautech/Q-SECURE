@@ -121,5 +121,5 @@
 4. Received submatrices (i.e. results) are decrypted and concatenated into a single matrix, which is the final result
 
 <div align="center">
-   <img alt="MPC System Design" src="https://media.licdn.com/dms/image/v2/D4E2DAQEm3J4NVypV1Q/profile-treasury-image-shrink_800_800/profile-treasury-image-shrink_800_800/0/1723823236619?e=1724428800&v=beta&t=g5L7EZ_4hHJc2qbV9pGKdI8-0MIGNdHIaj3nU4JqSqc">
+   <img alt="MPC System Design" src="https://lynkos.dev/assets/img/misc/mpc.webp">
 </div>
